@@ -1,5 +1,7 @@
 # 电商生态 AI Agent 平台
 
+[![AI Core Tests](https://github.com/H-shuohao/ecommerce-ai-platform/actions/workflows/ai-core-tests.yml/badge.svg)](https://github.com/H-shuohao/ecommerce-ai-platform/actions/workflows/ai-core-tests.yml)
+
 面向应届生求职展示的个人 AI 工程项目。项目以模拟电商商品、库存和订单数据为业务基础，将大模型、RAG、Agent Loop、MCP、数据治理、评测与可观测能力组合成一套可以真实运行和验证的轻量平台。
 
 > 项目定位：个人作品集与工程实践，不宣称为真实企业生产系统。
