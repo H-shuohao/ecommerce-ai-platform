@@ -1,0 +1,12 @@
+services:
+  ai-core:
+    build:
+      context: ./services/ai-core
+    container_name: ecommerce-ai-core
+    env_file:
+      - ./services/ai-core/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/ai-core/data:/app/data
+    restart: unless-stopped

@@ -1,0 +1,11 @@
+{
+  "include": [
+    "services/ai-core"
+  ],
+  "extraPaths": [
+    "services/ai-core"
+  ],
+  "venvPath": "services/ai-core",
+  "venv": ".venv",
+  "typeCheckingMode": "basic"
+}

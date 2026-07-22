@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>小懒 AI 导购</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">ECOMMERCE AI · PRESALES AGENT</p>
+          <h1>小懒 AI 导购</h1>
+          <p class="subtitle">商品推荐、库存查询与连续对话，都可以直接问我。</p>
+        </div>
+        <button id="new-chat" class="secondary" type="button">＋ 新建对话</button>
+      </header>
+
+      <section class="statusbar" aria-label="系统状态">
+        <span><i class="dot"></i>AI 服务已连接</span>
+        <span id="session-label">新会话</span>
+      </section>
+
+      <section id="messages" class="messages" aria-live="polite">
+        <article class="message assistant">
+          <div class="avatar">AI</div>
+          <div class="bubble">
+            <p>你好，我是你的智能导购。你可以让我推荐商品、查询库存，也可以接着追问“它多少钱”。</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="suggestions" aria-label="快捷问题">
+        <button type="button">推荐一款适合油皮的商品</button>
+        <button type="button">P1002 现在有库存吗？</button>
+        <button type="button">查询订单 O20260720001</button>
+      </section>
+
+      <form id="chat-form" class="composer">
+        <label class="sr-only" for="question">输入问题</label>
+        <textarea id="question" rows="1" maxlength="1000" placeholder="输入你的问题，按 Enter 发送…" required></textarea>
+        <button id="send" type="submit">发送</button>
+      </form>
+      <p class="hint">Enter 发送 · Shift + Enter 换行 · 会话编号由系统自动管理</p>
+    </main>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

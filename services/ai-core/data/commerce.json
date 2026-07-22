@@ -1,0 +1,20 @@
+{
+  "products": [
+    {"id": "P1001", "name": "清爽防晒乳 SPF50+", "category": "美妆个护", "brand": "晨光实验室", "price": 129.0, "description": "轻薄不黏腻，适合油性和混合性肤质日常通勤。", "tags": ["防晒", "油皮", "通勤"]},
+    {"id": "P1002", "name": "保湿修护面霜", "category": "美妆个护", "brand": "晨光实验室", "price": 159.0, "description": "含神经酰胺，适合干性和敏感肌肤夜间修护。", "tags": ["保湿", "干皮", "敏感肌"]},
+    {"id": "P2001", "name": "降噪蓝牙耳机 Pro", "category": "数码", "brand": "声界", "price": 399.0, "description": "支持主动降噪、双设备连接和 30 小时综合续航。", "tags": ["耳机", "降噪", "通勤"]},
+    {"id": "P2002", "name": "便携蓝牙音箱", "category": "数码", "brand": "声界", "price": 229.0, "description": "IPX7 防水，适合户外和室内使用。", "tags": ["音箱", "防水", "户外"]},
+    {"id": "P3001", "name": "轻量保温杯 500ml", "category": "家居", "brand": "简居", "price": 89.0, "description": "食品级不锈钢内胆，适合通勤携带。", "tags": ["保温杯", "通勤", "轻量"]}
+  ],
+  "inventory": {
+    "P1001": 36,
+    "P1002": 0,
+    "P2001": 12,
+    "P2002": 8,
+    "P3001": 50
+  },
+  "orders": [
+    {"id": "O20260720001", "user_id": "U001", "status": "shipped", "product_ids": ["P2001"], "total_amount": 399.0, "tracking_number": "SF1234567890"},
+    {"id": "O20260720002", "user_id": "U002", "status": "paid", "product_ids": ["P1001", "P3001"], "total_amount": 218.0, "tracking_number": null}
+  ]
+}
