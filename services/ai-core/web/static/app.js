@@ -11,7 +11,7 @@ function updateSessionLabel() {
   sessionLabel.textContent = sessionId ? `会话 ${sessionId.slice(0, 8)}` : "新会话";
 }
 
-function addMessage(role, content, trace = "") {
+function addMessage(role, content, trace = "", runId = "") {
   const article = document.createElement("article");
   article.className = `message ${role}`;
   if (role === "assistant") {
@@ -28,7 +28,19 @@ function addMessage(role, content, trace = "") {
   if (trace) {
     const detail = document.createElement("div");
     detail.className = "trace";
-    detail.textContent = trace;
+    const summary = document.createElement("span");
+    summary.textContent = trace;
+    detail.appendChild(summary);
+    if (runId) {
+      const runLink = document.createElement("a");
+      runLink.className = "run-link";
+      runLink.href = `/api/v1/agents/runs/${encodeURIComponent(runId)}`;
+      runLink.target = "_blank";
+      runLink.rel = "noopener";
+      runLink.textContent = `运行详情 ${runId.slice(0, 8)}`;
+      runLink.title = "打开本次 Agent 的问题、工具参数、工具结果和耗时记录";
+      detail.appendChild(runLink);
+    }
     bubble.appendChild(detail);
   }
   article.appendChild(bubble);
@@ -73,7 +85,7 @@ async function submitQuestion(question) {
     const tools = data.tool_calls.map((call) => call.tool).join(" → ");
     const trace = `${tools ? `工具：${tools} · ` : ""}耗时：${data.duration_ms} ms`;
     loading.remove();
-    addMessage("assistant", data.answer, trace);
+    addMessage("assistant", data.answer, trace, data.run_id);
     updateSessionLabel();
   } catch (error) {
     loading.remove();

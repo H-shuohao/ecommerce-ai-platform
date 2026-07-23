@@ -41,7 +41,9 @@ h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); letter-spacing: -.04em; }
 .bubble { max-width: min(700px, 82%); padding: 14px 17px; background: #f1f5f2; border: 1px solid #e1e8e4; border-radius: 5px 17px 17px; line-height: 1.7; }
 .user .bubble { color: white; background: #236f51; border: 0; border-radius: 17px 5px 17px 17px; }
 .bubble p { margin: 0; white-space: pre-wrap; }
-.trace { margin-top: 10px; padding-top: 9px; color: #65736d; border-top: 1px solid #dce5e0; font-size: 12px; }
+.trace { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin-top: 10px; padding-top: 9px; color: #65736d; border-top: 1px solid #dce5e0; font-size: 12px; }
+.run-link { color: #236f51; font-weight: 700; text-decoration: none; }
+.run-link:hover { text-decoration: underline; }
 .loading .bubble { color: #718079; }
 
 .suggestions { display: flex; gap: 8px; padding: 0 34px 14px; overflow-x: auto; }

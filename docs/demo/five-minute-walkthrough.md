@@ -58,10 +58,10 @@
 
 在 Swagger 中打开：
 
-1. `GET /api/v1/agents/runs`
-2. 复制刚才一次运行的 `run_id`
-3. 打开 `GET /api/v1/agents/runs/{run_id}`
-4. 打开 `GET /api/v1/agents/runs/metrics`
+1. 点击回答下方的“运行详情”链接，直接查看本次 Run；
+2. 或在 Swagger 打开 `GET /api/v1/agents/runs`；
+3. 复制一次运行的 `run_id`，打开 `GET /api/v1/agents/runs/{run_id}`；
+4. 打开 `GET /api/v1/agents/runs/metrics` 查看汇总指标。
 
 观察：
 
