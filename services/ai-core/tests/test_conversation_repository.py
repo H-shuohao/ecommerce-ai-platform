@@ -34,6 +34,26 @@ class ConversationRepositoryTests(unittest.TestCase):
         self.assertIsNone(repository.get_session("not-exists"))
         db.connection.close()
 
+    def test_remember_current_product_without_polluting_messages(self) -> None:
+        db = Database(":memory:")
+        repository = ConversationRepository(db)
+        session_id = repository.ensure_session("entity-memory")
+        repository.append_exchange(
+            session_id,
+            "推荐适合油皮的商品",
+            "为您推荐一款清爽防晒乳。",
+        )
+
+        repository.set_current_product_id(session_id, "p1001")
+
+        self.assertEqual(repository.get_current_product_id(session_id), "P1001")
+        session = repository.get_session(session_id)
+        self.assertIsNotNone(session)
+        assert session is not None
+        self.assertEqual(session.current_product_id, "P1001")
+        self.assertNotIn("P1001", session.messages[-1].content)
+        db.connection.close()
+
 
 if __name__ == "__main__":
     unittest.main()

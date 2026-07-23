@@ -421,7 +421,11 @@ class ApiBaselineTests(unittest.TestCase):
         conversation_repository.append_exchange(
             "inventory-memory-test",
             "请介绍这个商品",
-            "推荐商品 P1001。",
+            "为您推荐一款清爽防晒乳。",
+        )
+        conversation_repository.set_current_product_id(
+            "inventory-memory-test",
+            "P1001",
         )
         response = self.client.post(
             "/api/v1/agents/presales/chat",
@@ -438,6 +442,11 @@ class ApiBaselineTests(unittest.TestCase):
         self.assertEqual(calls[0]["arguments"]["product_id"], "P1001")
         self.assertEqual(calls[0]["result"]["inventory"]["quantity"], 36)
         self.assertEqual(complete.call_count, 1)
+
+        session = self.client.get(
+            "/api/v1/agents/sessions/inventory-memory-test"
+        ).json()
+        self.assertEqual(session["current_product_id"], "P1001")
 
     @patch("app.api.rtc.build_rtc_token", return_value="test-rtc-token")
     def test_get_scenes_returns_rtc_configuration(self, build_token) -> None:

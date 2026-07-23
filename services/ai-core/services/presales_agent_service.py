@@ -78,6 +78,7 @@ class PresalesAgentService:
         self,
         question: str,
         history: list[dict[str, str]] | None = None,
+        current_product_id: str | None = None,
     ) -> AgentChatResponse:
         conversation_history = history or []
         tool_definitions = [
@@ -95,9 +96,9 @@ class PresalesAgentService:
             self._requires_fresh_inventory(question)
             and self._find_product_id(question) is None
         ):
-            direct_inventory_product_id = self._find_recent_product_id(
-                question,
-                conversation_history,
+            direct_inventory_product_id = (
+                current_product_id
+                or self._find_recent_product_id(question, conversation_history)
             )
         if direct_inventory_product_id:
             arguments = {"product_id": direct_inventory_product_id}

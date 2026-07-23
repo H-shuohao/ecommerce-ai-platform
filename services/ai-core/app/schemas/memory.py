@@ -13,4 +13,5 @@ class ConversationSession(BaseModel):
     id: str
     created_at: str
     updated_at: str
+    current_product_id: str | None = None
     messages: list[ConversationMessage]

@@ -51,7 +51,8 @@ class Database:
                 CREATE TABLE IF NOT EXISTS conversation_sessions (
                     id TEXT PRIMARY KEY,
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    current_product_id TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS conversation_messages (
@@ -148,6 +149,17 @@ class Database:
                 ON media_assets(product_id, asset_type, created_at DESC);
                 """
             )
+            session_columns = {
+                row["name"]
+                for row in self.connection.execute(
+                    "PRAGMA table_info(conversation_sessions)"
+                ).fetchall()
+            }
+            if "current_product_id" not in session_columns:
+                self.connection.execute(
+                    "ALTER TABLE conversation_sessions "
+                    "ADD COLUMN current_product_id TEXT"
+                )
 
 
 database = Database()

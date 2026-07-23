@@ -22,8 +22,13 @@ async def presales_chat(request: AgentChatRequest) -> AgentChatResponse:
     started_at = time.perf_counter()
     session_id = conversation_repository.ensure_session(request.session_id)
     history = conversation_repository.get_recent_messages(session_id, limit=6)
+    current_product_id = conversation_repository.get_current_product_id(session_id)
     try:
-        response = await presales_agent_service.run(request.question, history=history)
+        response = await presales_agent_service.run(
+            request.question,
+            history=history,
+            current_product_id=current_product_id,
+        )
     except (KeyError, TypeError, ValueError) as error:
         duration_ms = max(1, int((time.perf_counter() - started_at) * 1000))
         agent_run_repository.record(
@@ -57,6 +62,16 @@ async def presales_chat(request: AgentChatRequest) -> AgentChatResponse:
         request.question,
         response.answer,
     )
+    selected_product_ids = [
+        str(call.arguments["product_id"]).strip().upper()
+        for call in response.tool_calls
+        if call.arguments.get("product_id")
+    ]
+    if selected_product_ids:
+        conversation_repository.set_current_product_id(
+            session_id,
+            selected_product_ids[-1],
+        )
     return response.model_copy(
         update={
             "run_id": run_id,

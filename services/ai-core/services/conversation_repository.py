@@ -46,6 +46,33 @@ class ConversationRepository:
                 (now, session_id),
             )
 
+    def set_current_product_id(self, session_id: str, product_id: str) -> None:
+        normalized_id = product_id.strip().upper()
+        if not normalized_id:
+            raise ValueError("商品ID不能为空")
+        now = datetime.now(timezone.utc).isoformat()
+        with self.db.lock, self.db.connection:
+            cursor = self.db.connection.execute(
+                """
+                UPDATE conversation_sessions
+                SET current_product_id = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (normalized_id, now, session_id),
+            )
+            if cursor.rowcount == 0:
+                raise KeyError("会话不存在")
+
+    def get_current_product_id(self, session_id: str) -> str | None:
+        with self.db.lock:
+            row = self.db.connection.execute(
+                "SELECT current_product_id FROM conversation_sessions WHERE id = ?",
+                (session_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return row["current_product_id"]
+
     def get_recent_messages(self, session_id: str, limit: int = 6) -> list[dict[str, str]]:
         with self.db.lock:
             rows = self.db.connection.execute(
@@ -80,6 +107,7 @@ class ConversationRepository:
             id=session["id"],
             created_at=session["created_at"],
             updated_at=session["updated_at"],
+            current_product_id=session["current_product_id"],
             messages=[ConversationMessage(**dict(row)) for row in rows],
         )
 
