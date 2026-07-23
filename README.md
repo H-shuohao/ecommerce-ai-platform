@@ -28,8 +28,6 @@
 
 第一次查看项目可按[五分钟稳定演示路线](docs/demo/five-minute-walkthrough.md)，从售前 Agent、多轮记忆、运行追踪一路演示到数据中台和 GitHub Actions。
 
-求职介绍与技术边界见[正式项目介绍与背诵提纲](docs/interview/30-formal-project-introduction.md)。
-
 ```text
 浏览器 / RTC Agent / MCP Client
               │
@@ -62,7 +60,7 @@ ecommerce-ai-platform/
 ├─ docs/
 │  ├─ architecture/         # 架构与技术决策
 │  ├─ evaluation/           # 真实评测记录
-│  └─ interview/            # 面试复习与真实问题案例
+│  └─ demo/                 # 稳定演示路线
 ├─ services/
 │  └─ ai-core/
 │     ├─ app/               # API、Schema、Repository、Tools、MCP

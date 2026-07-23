@@ -110,7 +110,8 @@
 - `AI Core Tests` 绿色徽章；
 - GitHub Actions 自动测试记录；
 - `tests`、`Dockerfile`、`docker-compose.yml`；
-- `docs/interview` 中的学习与问题复盘。
+- `docs/architecture` 中的系统架构与真实能力边界；
+- `docs/evaluation` 中的评测记录。
 
 讲解：
 

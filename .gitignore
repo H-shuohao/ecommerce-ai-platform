@@ -25,3 +25,6 @@ logs/
 *.db-shm
 *.db-wal
 uploads/
+
+# Private career preparation (kept outside the public repository)
+docs/interview/
