@@ -15,6 +15,7 @@ PLANNER_PROMPT = """
 格式：{"tool": "工具名或null", "arguments": {}}
 每轮最多选择一个工具；如果已有信息足够回答，将 tool 设为 null。
 如果用户要求“有库存”或查询库存，获得商品 ID 后必须继续调用 check_inventory。
+同一轮中 check_inventory 已返回目标商品库存后，必须将 tool 设为 null，不要再搜索或重复查询。
 工具参数只能使用工具定义中列出的精确参数名，不能创造 price_range 等未定义参数。
 不能编造工具名称、参数或商品 ID，只能使用工具结果中真实出现的数据。
 """.strip()
@@ -68,6 +69,11 @@ class PresalesAgentService:
                 return matches[-1].upper()
         return None
 
+    @staticmethod
+    def _find_product_id(text: str) -> str | None:
+        matches = re.findall(r"\bP\d+\b", text, flags=re.IGNORECASE)
+        return matches[-1].upper() if matches else None
+
     async def run(
         self,
         question: str,
@@ -81,72 +87,94 @@ class PresalesAgentService:
         traces: list[ToolCallTrace] = []
         executed_calls: set[str] = set()
 
-        for _ in range(self.max_tool_calls):
-            planner_context = {
-                "available_tools": tool_definitions,
-                "question": question,
-                "conversation_history": conversation_history,
-                "previous_tool_calls": [trace.model_dump() for trace in traces],
-            }
-            planner_messages = [
-                {"role": "system", "content": PLANNER_PROMPT},
-                {
-                    "role": "user",
-                    "content": json.dumps(planner_context, ensure_ascii=False),
-                },
-            ]
-            plan_text = await asyncio.to_thread(
-                llm_service.complete,
-                planner_messages,
-                max_tokens=200,
-                temperature=0.0,
+        # A pronoun-based inventory follow-up already has a product selected in
+        # conversation history. Route this deterministic case directly to the
+        # live inventory tool instead of asking the LLM to rediscover it.
+        direct_inventory_product_id = None
+        if (
+            self._requires_fresh_inventory(question)
+            and self._find_product_id(question) is None
+        ):
+            direct_inventory_product_id = self._find_recent_product_id(
+                question,
+                conversation_history,
             )
-            plan = self._extract_json(plan_text)
-            print(f"[PresalesAgent] 第{len(traces) + 1}轮计划: {plan}")
-            tool_name = plan.get("tool")
-            arguments = plan.get("arguments") or {}
-            if self._should_stop_tool_loop(tool_name):
-                inventory_already_checked = any(
-                    trace.tool == "check_inventory" for trace in traces
-                )
-                if (
-                    self._requires_fresh_inventory(question)
-                    and not inventory_already_checked
-                ):
-                    product_id = self._find_recent_product_id(
-                        question,
-                        conversation_history,
-                    )
-                    if product_id:
-                        result = tool_registry.invoke(
-                            "check_inventory",
-                            {"product_id": product_id},
-                        )
-                        traces.append(
-                            ToolCallTrace(
-                                tool="check_inventory",
-                                arguments={"product_id": product_id},
-                                result=result,
-                            )
-                        )
-                        continue
-                break
-            if not isinstance(tool_name, str) or not isinstance(arguments, dict):
-                raise ValueError("工具计划格式不正确")
-
-            call_key = json.dumps(
-                {"tool": tool_name, "arguments": arguments},
-                ensure_ascii=False,
-                sort_keys=True,
-            )
-            if call_key in executed_calls:
-                raise ValueError("模型重复调用了相同工具和参数")
-            executed_calls.add(call_key)
-
-            result = tool_registry.invoke(tool_name, arguments)
+        if direct_inventory_product_id:
+            arguments = {"product_id": direct_inventory_product_id}
             traces.append(
-                ToolCallTrace(tool=tool_name, arguments=arguments, result=result)
+                ToolCallTrace(
+                    tool="check_inventory",
+                    arguments=arguments,
+                    result=tool_registry.invoke("check_inventory", arguments),
+                )
             )
+        else:
+            for _ in range(self.max_tool_calls):
+                planner_context = {
+                    "available_tools": tool_definitions,
+                    "question": question,
+                    "conversation_history": conversation_history,
+                    "previous_tool_calls": [trace.model_dump() for trace in traces],
+                }
+                planner_messages = [
+                    {"role": "system", "content": PLANNER_PROMPT},
+                    {
+                        "role": "user",
+                        "content": json.dumps(planner_context, ensure_ascii=False),
+                    },
+                ]
+                plan_text = await asyncio.to_thread(
+                    llm_service.complete,
+                    planner_messages,
+                    max_tokens=200,
+                    temperature=0.0,
+                )
+                plan = self._extract_json(plan_text)
+                print(f"[PresalesAgent] 第{len(traces) + 1}轮计划: {plan}")
+                tool_name = plan.get("tool")
+                arguments = plan.get("arguments") or {}
+                if self._should_stop_tool_loop(tool_name):
+                    inventory_already_checked = any(
+                        trace.tool == "check_inventory" for trace in traces
+                    )
+                    if (
+                        self._requires_fresh_inventory(question)
+                        and not inventory_already_checked
+                    ):
+                        product_id = self._find_recent_product_id(
+                            question,
+                            conversation_history,
+                        )
+                        if product_id:
+                            result = tool_registry.invoke(
+                                "check_inventory",
+                                {"product_id": product_id},
+                            )
+                            traces.append(
+                                ToolCallTrace(
+                                    tool="check_inventory",
+                                    arguments={"product_id": product_id},
+                                    result=result,
+                                )
+                            )
+                            continue
+                    break
+                if not isinstance(tool_name, str) or not isinstance(arguments, dict):
+                    raise ValueError("工具计划格式不正确")
+
+                call_key = json.dumps(
+                    {"tool": tool_name, "arguments": arguments},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+                if call_key in executed_calls:
+                    raise ValueError("模型重复调用了相同工具和参数")
+                executed_calls.add(call_key)
+
+                result = tool_registry.invoke(tool_name, arguments)
+                traces.append(
+                    ToolCallTrace(tool=tool_name, arguments=arguments, result=result)
+                )
 
         rag_result = await rag_service.retrieve_result(question)
         rag_context = rag_result.context if rag_result.relevant else ""

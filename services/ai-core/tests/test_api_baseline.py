@@ -413,13 +413,16 @@ class ApiBaselineTests(unittest.TestCase):
         retrieve: AsyncMock,
         complete,
     ) -> None:
-        complete.side_effect = [
-            '{"tool":null,"arguments":{}}',
-            '{"tool":null,"arguments":{}}',
-            "P1001 当前库存为 36 件。",
-        ]
+        complete.return_value = "P1001 当前库存为 36 件。"
         retrieve.return_value = RagResult(reason="no_result")
 
+        from services.conversation_repository import conversation_repository
+
+        conversation_repository.append_exchange(
+            "inventory-memory-test",
+            "请介绍这个商品",
+            "推荐商品 P1001。",
+        )
         response = self.client.post(
             "/api/v1/agents/presales/chat",
             json={
@@ -428,35 +431,13 @@ class ApiBaselineTests(unittest.TestCase):
             },
         )
 
-        # The session may be new in an isolated test, so seed-like context is
-        # verified at service level by adding a prior message directly.
-        if response.status_code == 200 and not response.json()["tool_calls"]:
-            from services.conversation_repository import conversation_repository
-
-            conversation_repository.append_exchange(
-                "inventory-memory-test",
-                "请介绍这个商品",
-                "推荐商品 P1001。",
-            )
-            complete.reset_mock()
-            complete.side_effect = [
-                '{"tool":null,"arguments":{}}',
-                '{"tool":null,"arguments":{}}',
-                "P1001 当前库存为 36 件。",
-            ]
-            response = self.client.post(
-                "/api/v1/agents/presales/chat",
-                json={
-                    "question": "那它现在有库存吗？",
-                    "session_id": "inventory-memory-test",
-                },
-            )
-
         self.assertEqual(response.status_code, 200)
         calls = response.json()["tool_calls"]
+        self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["tool"], "check_inventory")
         self.assertEqual(calls[0]["arguments"]["product_id"], "P1001")
         self.assertEqual(calls[0]["result"]["inventory"]["quantity"], 36)
+        self.assertEqual(complete.call_count, 1)
 
     @patch("app.api.rtc.build_rtc_token", return_value="test-rtc-token")
     def test_get_scenes_returns_rtc_configuration(self, build_token) -> None:
