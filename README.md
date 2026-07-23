@@ -26,6 +26,8 @@
 
 详细架构图与请求链路见：[当前已实现系统架构](docs/architecture/current-system.md)。原始8项目规划与真实完成度见：[八项目进度矩阵](docs/architecture/eight-project-roadmap.md)。
 
+第一次查看项目可按[五分钟稳定演示路线](docs/demo/five-minute-walkthrough.md)，从售前 Agent、多轮记忆、运行追踪一路演示到数据中台和 GitHub Actions。
+
 ```text
 浏览器 / RTC Agent / MCP Client
               │
