@@ -31,6 +31,7 @@ FINAL_PROMPT = """
 class PresalesAgentService:
     max_tool_calls = 3
     stop_tool_names = {"", "null", "none", "nil", "no_tool"}
+    terminal_tool_names = {"get_product", "check_inventory", "query_order"}
 
     @staticmethod
     def _extract_json(text: str) -> dict[str, Any]:
@@ -176,9 +177,16 @@ class PresalesAgentService:
                 traces.append(
                     ToolCallTrace(tool=tool_name, arguments=arguments, result=result)
                 )
+                if tool_name in self.terminal_tool_names:
+                    break
 
-        rag_result = await rag_service.retrieve_result(question)
-        rag_context = rag_result.context if rag_result.relevant else ""
+        # Structured business tools are authoritative for product, inventory,
+        # and order facts. RAG is reserved for questions that were not handled
+        # by those tools, avoiding an unrelated external retrieval round trip.
+        rag_context = ""
+        if not traces:
+            rag_result = await rag_service.retrieve_result(question)
+            rag_context = rag_result.context if rag_result.relevant else ""
         final_context = {
             "question": question,
             "conversation_history": conversation_history,

@@ -348,7 +348,6 @@ class ApiBaselineTests(unittest.TestCase):
     ) -> None:
         complete.side_effect = [
             '{"tool":"check_inventory","arguments":{"product_id":"P1002"}}',
-            '{"tool":"null","arguments":{}}',
             "P1002 当前无库存。",
         ]
         retrieve.return_value = RagResult(reason="no_result")
@@ -364,7 +363,8 @@ class ApiBaselineTests(unittest.TestCase):
         inventory = response.json()["tool_calls"][0]["result"]["inventory"]
         self.assertEqual(inventory["quantity"], 0)
         self.assertFalse(response.json()["rag_used"])
-        self.assertEqual(complete.call_count, 3)
+        self.assertEqual(complete.call_count, 2)
+        retrieve.assert_not_awaited()
         self.assertEqual(response.json()["run_id"], "run-test")
         record_run.assert_called_once()
 
@@ -383,7 +383,6 @@ class ApiBaselineTests(unittest.TestCase):
         complete.side_effect = [
             '{"tool":"search_products","arguments":{"keyword":"油皮"}}',
             '{"tool":"check_inventory","arguments":{"product_id":"P1001"}}',
-            '{"tool":null,"arguments":{}}',
             "推荐 P1001，适合油皮且当前有库存。",
         ]
         retrieve.return_value = RagResult(reason="no_result")
@@ -398,7 +397,8 @@ class ApiBaselineTests(unittest.TestCase):
         self.assertEqual([call["tool"] for call in calls], ["search_products", "check_inventory"])
         self.assertEqual(calls[0]["result"]["items"][0]["id"], "P1001")
         self.assertEqual(calls[1]["result"]["inventory"]["quantity"], 36)
-        self.assertEqual(complete.call_count, 4)
+        self.assertEqual(complete.call_count, 3)
+        retrieve.assert_not_awaited()
         record_run.assert_called_once()
 
     @patch("services.presales_agent_service.llm_service.complete")
