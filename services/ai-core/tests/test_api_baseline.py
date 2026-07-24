@@ -418,6 +418,7 @@ class ApiBaselineTests(unittest.TestCase):
 
         from services.conversation_repository import conversation_repository
 
+        conversation_repository.ensure_session("inventory-memory-test")
         conversation_repository.append_exchange(
             "inventory-memory-test",
             "请介绍这个商品",
