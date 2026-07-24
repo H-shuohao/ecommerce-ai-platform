@@ -26,6 +26,14 @@ from app.core.security import (
     service_access,
     viewer_access,
 )
+from app.core.observability import (
+    configure_logging,
+    http_exception_handler,
+    observe_request,
+    unexpected_exception_handler,
+    validation_exception_handler,
+)
+from fastapi.exceptions import RequestValidationError
 
 
 @asynccontextmanager
@@ -55,6 +63,10 @@ app = FastAPI(
     openapi_tags=OPENAPI_TAGS,
     lifespan=lifespan,
 )
+configure_logging()
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, unexpected_exception_handler)
 
 
 @app.middleware("http")
@@ -83,6 +95,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(observe_request)
 
 app.include_router(health_router)
 app.include_router(debug_router, dependencies=[Depends(service_access)])

@@ -24,6 +24,7 @@ class ApiSecurityTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["detail"], "缺少 API Key")
+        self.assertTrue(response.headers["X-Request-ID"])
 
     @patch.multiple("app.core.security.settings", **AUTH_SETTINGS)
     def test_invalid_api_key_is_rejected(self) -> None:
@@ -72,6 +73,7 @@ class ApiSecurityTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["detail"], "缺少 API Key")
+        self.assertTrue(response.headers["X-Request-ID"])
 
     @patch.multiple("app.core.security.settings", **AUTH_SETTINGS)
     def test_mcp_rejects_viewer_role(self) -> None:
@@ -82,6 +84,7 @@ class ApiSecurityTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["detail"], "当前身份没有访问 MCP 的权限")
+        self.assertTrue(response.headers["X-Request-ID"])
 
     @patch("app.core.security.settings.API_AUTH_ENABLED", False)
     def test_local_development_remains_compatible(self) -> None:

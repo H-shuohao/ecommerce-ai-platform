@@ -13,6 +13,7 @@ class Config:
     API_VIEWER_KEY = os.getenv("API_VIEWER_KEY")
     API_SERVICE_KEY = os.getenv("API_SERVICE_KEY")
     API_ADMIN_KEY = os.getenv("API_ADMIN_KEY")
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
 
     VOLC_AK = os.getenv("VOLC_ACCESS_KEY")
     VOLC_SK = os.getenv("VOLC_SECRET_KEY")
