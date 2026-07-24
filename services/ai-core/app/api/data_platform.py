@@ -10,9 +10,39 @@ from app.schemas.data_platform import (
 from services.data_publication_service import data_publication_service
 from services.data_release_repository import data_release_repository
 from services.data_platform_service import data_platform_service
+from services.commerce_service import commerce_service
 
 
 router = APIRouter(prefix="/api/v1/data-platform", tags=["AI 数据中台"])
+
+
+@router.get(
+    "/cache/commerce",
+    summary="查看商品查询缓存指标",
+)
+async def get_commerce_cache_stats() -> dict:
+    stats = commerce_service.get_product_cache_stats()
+    return {
+        "size": stats.size,
+        "max_entries": stats.max_entries,
+        "ttl_seconds": stats.ttl_seconds,
+        "hits": stats.hits,
+        "misses": stats.misses,
+        "evictions": stats.evictions,
+        "hit_rate": stats.hit_rate,
+    }
+
+
+@router.delete(
+    "/cache/commerce",
+    summary="清空商品查询缓存",
+)
+async def clear_commerce_cache() -> dict:
+    cleared_entries = commerce_service.clear_product_cache()
+    return {
+        "cleared_entries": cleared_entries,
+        "status": "cleared",
+    }
 
 
 @router.get(

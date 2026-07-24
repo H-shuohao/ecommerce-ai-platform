@@ -2,14 +2,24 @@ import json
 from pathlib import Path
 
 from app.schemas.commerce import InventoryResponse, Order, Product
+from config import settings
 from database import database
+from services.cache_service import TTLCache
 
 
 DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "commerce.json"
 
 
 class CommerceService:
-    def __init__(self, data_file: Path = DATA_FILE) -> None:
+    def __init__(
+        self,
+        data_file: Path = DATA_FILE,
+        product_search_cache: TTLCache | None = None,
+    ) -> None:
+        self.product_search_cache = product_search_cache or TTLCache(
+            ttl_seconds=settings.CACHE_TTL_SECONDS,
+            max_entries=settings.CACHE_MAX_ENTRIES,
+        )
         with data_file.open("r", encoding="utf-8") as file:
             raw_data = json.load(file)
 
@@ -44,8 +54,46 @@ class CommerceService:
         self.products = products
         self.inventory = inventory
         self.orders = orders
+        self.product_search_cache.clear()
 
     def search_products(
+        self,
+        keyword: str | None = None,
+        category: str | None = None,
+        max_price: float | None = None,
+    ) -> list[Product]:
+        products, _ = self.search_products_with_cache(
+            keyword=keyword,
+            category=category,
+            max_price=max_price,
+        )
+        return products
+
+    def search_products_with_cache(
+        self,
+        keyword: str | None = None,
+        category: str | None = None,
+        max_price: float | None = None,
+    ) -> tuple[list[Product], bool]:
+        cache_key = (
+            keyword.strip().casefold() if keyword else None,
+            category.strip().casefold() if category else None,
+            max_price,
+        )
+
+        cached_products, cache_hit = self.product_search_cache.get_or_set(
+            cache_key,
+            lambda: tuple(
+                self._filter_products(
+                    keyword=keyword,
+                    category=category,
+                    max_price=max_price,
+                )
+            ),
+        )
+        return list(cached_products), cache_hit
+
+    def _filter_products(
         self,
         keyword: str | None = None,
         category: str | None = None,
@@ -87,6 +135,12 @@ class CommerceService:
             products = [product for product in products if product.price <= max_price]
 
         return products
+
+    def clear_product_cache(self) -> int:
+        return self.product_search_cache.clear()
+
+    def get_product_cache_stats(self):
+        return self.product_search_cache.stats()
 
     def get_product(self, product_id: str) -> Product | None:
         return self.products.get(product_id)

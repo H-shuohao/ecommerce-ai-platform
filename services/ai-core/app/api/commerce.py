@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.schemas.commerce import InventoryResponse, Order, Product, ProductListResponse
 from services.commerce_service import commerce_service
@@ -9,15 +9,17 @@ router = APIRouter(prefix="/api/v1", tags=["电商数据"])
 
 @router.get("/products", response_model=ProductListResponse, summary="搜索商品")
 async def search_products(
+    response: Response,
     keyword: str | None = Query(default=None, description="名称、品牌、描述或标签"),
     category: str | None = Query(default=None, description="精确匹配商品分类"),
     max_price: float | None = Query(default=None, ge=0, description="最高价格"),
 ) -> ProductListResponse:
-    items = commerce_service.search_products(
+    items, cache_hit = commerce_service.search_products_with_cache(
         keyword=keyword,
         category=category,
         max_price=max_price,
     )
+    response.headers["X-Cache"] = "HIT" if cache_hit else "MISS"
     return ProductListResponse(items=items, total=len(items))
 
 

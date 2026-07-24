@@ -77,6 +77,7 @@ Evaluation：使用固定题目检查工具选择、答案与耗时
 - **Agent 评测系统**：固定测试集、工具选择准确率、耗时、历史版本与基线对比。
 - **运行可观测性**：记录 Agent 运行、工具调用、成功率、耗时和 RAG 使用情况。
 - **请求级可观测性**：为每次 HTTP 请求生成 `request_id`，输出 JSON 访问日志，并在统一错误响应中返回追踪编号。
+- **缓存与一致性**：商品搜索使用有界 TTL 缓存并统计命中率，数据版本发布或回滚时自动失效；实时库存和订单不缓存。
 - **标准 MCP Server**：通过 Streamable HTTP 暴露5个 Tools、1个 Resource和1个 Prompt。
 - **RTC 语音链路**：保留原项目 RTC、ASR、LLM/RAG、TTS 回调能力。
 - **容器化交付**：Dockerfile、Docker Compose、健康检查、端口映射和 SQLite 数据持久化。
@@ -85,7 +86,7 @@ Evaluation：使用固定题目检查工具选择、答案与耗时
 
 ## 真实验证结果
 
-- 自动化测试：`67/67` 通过。
+- 自动化测试：`75/75` 通过。
 - 售前 Agent 基线评测：`4/4` 通过。
 - 工具选择准确率：`100%`。
 - 基线平均耗时：`6368.75 ms`（真实模型调用环境，结果会随网络与模型状态变化）。
@@ -212,6 +213,22 @@ API_ADMIN_KEY=请替换为第三条随机长密钥
 ```
 
 访问日志包含请求方法、路径、状态码、耗时、客户端和 `request_id`，便于后续接入 Loki、ELK 或云日志平台。
+
+## 商品查询缓存
+
+商品搜索使用进程内 TTL 缓存，默认最多保存256组查询条件，每组结果保留60秒：
+
+```dotenv
+CACHE_TTL_SECONDS=60
+CACHE_MAX_ENTRIES=256
+```
+
+连续使用完全相同的参数请求 `GET /api/v1/products` 时，可以在响应头看到第一次为 `X-Cache: MISS`，第二次为 `X-Cache: HIT`。管理员可以通过数据中台接口查看命中率或手动清空：
+
+- `GET /api/v1/data-platform/cache/commerce`
+- `DELETE /api/v1/data-platform/cache/commerce`
+
+当数据中台发布或激活另一个商品数据版本时，旧商品缓存会自动清空。库存与订单属于动态数据，不进入该缓存，避免 Agent 使用过期库存。
 
 ## 自动化测试
 
