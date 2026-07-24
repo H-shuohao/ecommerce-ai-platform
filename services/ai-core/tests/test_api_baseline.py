@@ -346,10 +346,7 @@ class ApiBaselineTests(unittest.TestCase):
         retrieve: AsyncMock,
         complete,
     ) -> None:
-        complete.side_effect = [
-            '{"tool":"check_inventory","arguments":{"product_id":"P1002"}}',
-            "P1002 当前无库存。",
-        ]
+        complete.return_value = "P1002 当前无库存。"
         retrieve.return_value = RagResult(reason="no_result")
 
         response = self.client.post(
@@ -363,7 +360,7 @@ class ApiBaselineTests(unittest.TestCase):
         inventory = response.json()["tool_calls"][0]["result"]["inventory"]
         self.assertEqual(inventory["quantity"], 0)
         self.assertFalse(response.json()["rag_used"])
-        self.assertEqual(complete.call_count, 2)
+        self.assertEqual(complete.call_count, 1)
         retrieve.assert_not_awaited()
         self.assertEqual(response.json()["run_id"], "run-test")
         record_run.assert_called_once()

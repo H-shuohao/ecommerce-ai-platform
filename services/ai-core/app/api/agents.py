@@ -1,6 +1,9 @@
+import json
 import time
+from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from app.schemas.agents import AgentChatRequest, AgentChatResponse
 from app.schemas.memory import ConversationSession
@@ -13,42 +16,26 @@ from services.presales_agent_service import presales_agent_service
 router = APIRouter(prefix="/api/v1/agents", tags=["业务 Agent"])
 
 
-@router.post(
-    "/presales/chat",
-    response_model=AgentChatResponse,
-    summary="运行售前咨询 Agent",
-)
-async def presales_chat(request: AgentChatRequest) -> AgentChatResponse:
-    started_at = time.perf_counter()
-    session_id = conversation_repository.ensure_session(request.session_id)
-    history = conversation_repository.get_recent_messages(session_id, limit=6)
-    current_product_id = conversation_repository.get_current_product_id(session_id)
-    try:
-        response = await presales_agent_service.run(
-            request.question,
-            history=history,
-            current_product_id=current_product_id,
-        )
-    except (KeyError, TypeError, ValueError) as error:
-        duration_ms = max(1, int((time.perf_counter() - started_at) * 1000))
-        agent_run_repository.record(
-            question=request.question,
-            status="failed",
-            duration_ms=duration_ms,
-            error=str(error),
-        )
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    except RuntimeError as error:
-        duration_ms = max(1, int((time.perf_counter() - started_at) * 1000))
-        agent_run_repository.record(
-            question=request.question,
-            status="failed",
-            duration_ms=duration_ms,
-            error=str(error),
-        )
-        raise HTTPException(status_code=502, detail=str(error)) from error
+def _duration_ms(started_at: float) -> int:
+    return max(1, int((time.perf_counter() - started_at) * 1000))
 
-    duration_ms = max(1, int((time.perf_counter() - started_at) * 1000))
+
+def _record_failed_run(question: str, started_at: float, error: Exception) -> None:
+    agent_run_repository.record(
+        question=question,
+        status="failed",
+        duration_ms=_duration_ms(started_at),
+        error=str(error),
+    )
+
+
+def _finalize_successful_run(
+    request: AgentChatRequest,
+    session_id: str,
+    response: AgentChatResponse,
+    started_at: float,
+) -> AgentChatResponse:
+    duration_ms = _duration_ms(started_at)
     run_id = agent_run_repository.record(
         question=request.question,
         status="success",
@@ -78,6 +65,109 @@ async def presales_chat(request: AgentChatRequest) -> AgentChatResponse:
             "duration_ms": duration_ms,
             "session_id": session_id,
         }
+    )
+
+
+def _ndjson(event: dict) -> str:
+    return json.dumps(event, ensure_ascii=False, default=str) + "\n"
+
+
+@router.post(
+    "/presales/chat",
+    response_model=AgentChatResponse,
+    summary="运行售前咨询 Agent",
+)
+async def presales_chat(request: AgentChatRequest) -> AgentChatResponse:
+    started_at = time.perf_counter()
+    session_id = conversation_repository.ensure_session(request.session_id)
+    history = conversation_repository.get_recent_messages(session_id, limit=6)
+    current_product_id = conversation_repository.get_current_product_id(session_id)
+    try:
+        response = await presales_agent_service.run(
+            request.question,
+            history=history,
+            current_product_id=current_product_id,
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        _record_failed_run(request.question, started_at, error)
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except RuntimeError as error:
+        _record_failed_run(request.question, started_at, error)
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    return _finalize_successful_run(
+        request,
+        session_id,
+        response,
+        started_at,
+    )
+
+
+@router.post(
+    "/presales/chat/stream",
+    response_class=StreamingResponse,
+    summary="流式运行售前咨询 Agent",
+    responses={
+        200: {
+            "content": {"application/x-ndjson": {}},
+            "description": "按行返回 session、status、tool、delta、done 或 error 事件。",
+        }
+    },
+)
+async def presales_chat_stream(request: AgentChatRequest) -> StreamingResponse:
+    started_at = time.perf_counter()
+    session_id = conversation_repository.ensure_session(request.session_id)
+    history = conversation_repository.get_recent_messages(session_id, limit=6)
+    current_product_id = conversation_repository.get_current_product_id(session_id)
+
+    async def generate_events() -> AsyncIterator[str]:
+        yield _ndjson({"event": "session", "session_id": session_id})
+        yield _ndjson(
+            {
+                "event": "status",
+                "stage": "planning",
+                "message": "正在分析问题并规划工具调用…",
+            }
+        )
+        try:
+            async for event in presales_agent_service.run_stream(
+                request.question,
+                history=history,
+                current_product_id=current_product_id,
+            ):
+                if event["event"] != "complete":
+                    yield _ndjson(event)
+                    continue
+                response = _finalize_successful_run(
+                    request,
+                    session_id,
+                    event["response"],
+                    started_at,
+                )
+                yield _ndjson(
+                    {
+                        "event": "done",
+                        **response.model_dump(),
+                    }
+                )
+        except (KeyError, TypeError, ValueError, RuntimeError) as error:
+            _record_failed_run(request.question, started_at, error)
+            yield _ndjson(
+                {
+                    "event": "error",
+                    "code": "AGENT_EXECUTION_FAILED",
+                    "message": str(error),
+                    "session_id": session_id,
+                }
+            )
+
+    return StreamingResponse(
+        generate_events(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

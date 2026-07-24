@@ -1,8 +1,11 @@
 import asyncio
 import json
 import re
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from typing import Any
 
+from app.core.streaming import next_from_sync_iterator
 from app.schemas.agents import AgentChatResponse, ToolCallTrace
 from app.tools.registry import tool_registry
 from services.llm_service import llm_service
@@ -28,10 +31,21 @@ FINAL_PROMPT = """
 """.strip()
 
 
+@dataclass(frozen=True)
+class PreparedAgentResponse:
+    final_messages: list[dict[str, Any]]
+    tool_calls: list[ToolCallTrace]
+    rag_used: bool
+
+
 class PresalesAgentService:
     max_tool_calls = 3
     stop_tool_names = {"", "null", "none", "nil", "no_tool"}
     terminal_tool_names = {"get_product", "check_inventory", "query_order"}
+    product_id_pattern = re.compile(
+        r"(?<![A-Za-z0-9])P\d+(?![A-Za-z0-9])",
+        flags=re.IGNORECASE,
+    )
 
     @staticmethod
     def _extract_json(text: str) -> dict[str, Any]:
@@ -65,22 +79,22 @@ class PresalesAgentService:
     ) -> str | None:
         contents = [message.get("content", "") for message in history]
         for content in reversed([*contents, question]):
-            matches = re.findall(r"\bP\d+\b", content, flags=re.IGNORECASE)
+            matches = PresalesAgentService.product_id_pattern.findall(content)
             if matches:
                 return matches[-1].upper()
         return None
 
     @staticmethod
     def _find_product_id(text: str) -> str | None:
-        matches = re.findall(r"\bP\d+\b", text, flags=re.IGNORECASE)
+        matches = PresalesAgentService.product_id_pattern.findall(text)
         return matches[-1].upper() if matches else None
 
-    async def run(
+    async def prepare(
         self,
         question: str,
         history: list[dict[str, str]] | None = None,
         current_product_id: str | None = None,
-    ) -> AgentChatResponse:
+    ) -> PreparedAgentResponse:
         conversation_history = history or []
         tool_definitions = [
             definition.model_dump()
@@ -93,12 +107,10 @@ class PresalesAgentService:
         # conversation history. Route this deterministic case directly to the
         # live inventory tool instead of asking the LLM to rediscover it.
         direct_inventory_product_id = None
-        if (
-            self._requires_fresh_inventory(question)
-            and self._find_product_id(question) is None
-        ):
+        if self._requires_fresh_inventory(question):
             direct_inventory_product_id = (
-                current_product_id
+                self._find_product_id(question)
+                or current_product_id
                 or self._find_recent_product_id(question, conversation_history)
             )
         if direct_inventory_product_id:
@@ -200,17 +212,80 @@ class PresalesAgentService:
                 "content": json.dumps(final_context, ensure_ascii=False),
             },
         ]
+        return PreparedAgentResponse(
+            final_messages=final_messages,
+            tool_calls=traces,
+            rag_used=bool(rag_context),
+        )
+
+    async def run(
+        self,
+        question: str,
+        history: list[dict[str, str]] | None = None,
+        current_product_id: str | None = None,
+    ) -> AgentChatResponse:
+        prepared = await self.prepare(
+            question,
+            history=history,
+            current_product_id=current_product_id,
+        )
         answer = await asyncio.to_thread(
             llm_service.complete,
-            final_messages,
+            prepared.final_messages,
             max_tokens=400,
             temperature=0.1,
         )
         return AgentChatResponse(
             answer=answer,
-            tool_calls=traces,
-            rag_used=bool(rag_context),
+            tool_calls=prepared.tool_calls,
+            rag_used=prepared.rag_used,
         )
+
+    async def run_stream(
+        self,
+        question: str,
+        history: list[dict[str, str]] | None = None,
+        current_product_id: str | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        prepared = await self.prepare(
+            question,
+            history=history,
+            current_product_id=current_product_id,
+        )
+        for trace in prepared.tool_calls:
+            yield {
+                "event": "tool",
+                "tool": trace.tool,
+                "arguments": trace.arguments,
+            }
+
+        iterator = iter(
+            llm_service.complete_stream(
+                prepared.final_messages,
+                max_tokens=400,
+                temperature=0.1,
+            )
+        )
+        sentinel = object()
+        answer_parts: list[str] = []
+        while True:
+            delta = await next_from_sync_iterator(iterator, sentinel)
+            if delta is sentinel:
+                break
+            answer_parts.append(delta)
+            yield {"event": "delta", "content": delta}
+
+        answer = "".join(answer_parts).strip()
+        if not answer:
+            raise RuntimeError("大模型没有返回有效回答")
+        yield {
+            "event": "complete",
+            "response": AgentChatResponse(
+                answer=answer,
+                tool_calls=prepared.tool_calls,
+                rag_used=prepared.rag_used,
+            ),
+        }
 
 
 presales_agent_service = PresalesAgentService()

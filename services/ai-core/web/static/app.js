@@ -25,6 +25,20 @@ function addMessage(role, content, trace = "", runId = "") {
   const paragraph = document.createElement("p");
   paragraph.textContent = content;
   bubble.appendChild(paragraph);
+  article.appendChild(bubble);
+  if (trace) attachTrace(article, trace, runId);
+  messages.appendChild(article);
+  messages.scrollTop = messages.scrollHeight;
+  return article;
+}
+
+function setMessageContent(article, content) {
+  article.querySelector(".bubble > p").textContent = content;
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function attachTrace(article, trace, runId = "") {
+  const bubble = article.querySelector(".bubble");
   if (trace) {
     const detail = document.createElement("div");
     detail.className = "trace";
@@ -43,10 +57,6 @@ function addMessage(role, content, trace = "", runId = "") {
     }
     bubble.appendChild(detail);
   }
-  article.appendChild(bubble);
-  messages.appendChild(article);
-  messages.scrollTop = messages.scrollHeight;
-  return article;
 }
 
 async function restoreHistory() {
@@ -64,6 +74,23 @@ async function restoreHistory() {
   updateSessionLabel();
 }
 
+async function submitLegacy(body, loading) {
+  const response = await fetch("/api/v1/agents/presales/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "请求失败");
+  sessionId = data.session_id;
+  localStorage.setItem(SESSION_KEY, sessionId);
+  const tools = data.tool_calls.map((call) => call.tool).join(" → ");
+  const trace = `${tools ? `工具：${tools} · ` : ""}耗时：${data.duration_ms} ms`;
+  loading.remove();
+  addMessage("assistant", data.answer, trace, data.run_id);
+  updateSessionLabel();
+}
+
 async function submitQuestion(question) {
   addMessage("user", question);
   const loading = addMessage("assistant", "正在分析商品与业务数据…");
@@ -73,19 +100,74 @@ async function submitQuestion(question) {
   try {
     const body = { question };
     if (sessionId) body.session_id = sessionId;
-    const response = await fetch("/api/v1/agents/presales/chat", {
+    const response = await fetch("/api/v1/agents/presales/chat/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail || "请求失败");
-    sessionId = data.session_id;
+    if (response.status === 404 || response.status === 405) {
+      await submitLegacy(body, loading);
+      return;
+    }
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.detail || "请求失败");
+    }
+    if (!response.body) {
+      await submitLegacy(body, loading);
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+    let answer = "";
+    let doneData = null;
+    const tools = [];
+
+    function handleEvent(event) {
+      if (event.event === "session") {
+        sessionId = event.session_id;
+        localStorage.setItem(SESSION_KEY, sessionId);
+        updateSessionLabel();
+      } else if (event.event === "status") {
+        setMessageContent(loading, event.message);
+      } else if (event.event === "tool") {
+        tools.push(event.tool);
+        setMessageContent(loading, `已调用 ${event.tool}，正在生成回答…`);
+      } else if (event.event === "delta") {
+        answer += event.content;
+        loading.classList.remove("loading");
+        setMessageContent(loading, answer);
+      } else if (event.event === "done") {
+        doneData = event;
+        if (!answer) {
+          answer = event.answer;
+          setMessageContent(loading, answer);
+        }
+      } else if (event.event === "error") {
+        throw new Error(event.message || "Agent 执行失败");
+      }
+    }
+
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        if (line.trim()) handleEvent(JSON.parse(line));
+      }
+      if (done) break;
+    }
+    if (buffer.trim()) handleEvent(JSON.parse(buffer));
+    if (!doneData) throw new Error("流式响应未正常结束");
+
+    loading.classList.remove("loading");
+    const trace = `${tools.length ? `工具：${tools.join(" → ")} · ` : ""}耗时：${doneData.duration_ms} ms`;
+    attachTrace(loading, trace, doneData.run_id);
+    sessionId = doneData.session_id;
     localStorage.setItem(SESSION_KEY, sessionId);
-    const tools = data.tool_calls.map((call) => call.tool).join(" → ");
-    const trace = `${tools ? `工具：${tools} · ` : ""}耗时：${data.duration_ms} ms`;
-    loading.remove();
-    addMessage("assistant", data.answer, trace, data.run_id);
     updateSessionLabel();
   } catch (error) {
     loading.remove();

@@ -101,5 +101,37 @@ class LLMService:
         except Exception as exc:
             raise RuntimeError(f"大模型调用失败: {exc}") from exc
 
+    def complete_stream(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        max_tokens: int = 512,
+        temperature: float = 0.1,
+    ) -> Iterator[str]:
+        """Yield final-answer text deltas from an OpenAI-compatible stream."""
+        if not self.client:
+            raise RuntimeError("大模型客户端未配置")
+
+        try:
+            stream = self.client.chat.completions.create(
+                model=settings.ARK_ENDPOINT_ID,
+                messages=messages,
+                temperature=temperature,
+                top_p=0.5,
+                max_tokens=max_tokens,
+                thinking={"type": "disabled"},
+                stream=True,
+            )
+            for chunk in stream:
+                choices = getattr(chunk, "choices", None)
+                if not choices:
+                    continue
+                delta = getattr(choices[0], "delta", None)
+                content = getattr(delta, "content", None)
+                if content:
+                    yield content
+        except Exception as exc:
+            raise RuntimeError(f"大模型流式调用失败: {exc}") from exc
+
 
 llm_service = LLMService()
