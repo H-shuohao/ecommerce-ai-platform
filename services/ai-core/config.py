@@ -16,6 +16,12 @@ class Config:
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
     CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", "60"))
     CACHE_MAX_ENTRIES = int(os.getenv("CACHE_MAX_ENTRIES", "256"))
+    LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
+    LLM_MAX_ATTEMPTS = max(1, int(os.getenv("LLM_MAX_ATTEMPTS", "2")))
+    LLM_RETRY_BACKOFF_SECONDS = max(
+        0.0,
+        float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "0.5")),
+    )
 
     VOLC_AK = os.getenv("VOLC_ACCESS_KEY")
     VOLC_SK = os.getenv("VOLC_SECRET_KEY")

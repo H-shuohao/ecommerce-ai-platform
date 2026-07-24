@@ -133,6 +133,22 @@ X-Accel-Buffering: no
 如果未来增加 Nginx，还需要关闭该路由的代理缓冲。Swagger 可能等待响应结束后
 一次性展示，流式效果应在 `/demo` 或支持流式读取的客户端中验证。
 
+### 模型请求超时或偶发网络错误
+
+模型调用由以下环境变量控制：
+
+```dotenv
+LLM_TIMEOUT_SECONDS=30
+LLM_MAX_ATTEMPTS=2
+LLM_RETRY_BACKOFF_SECONDS=0.5
+```
+
+- `LLM_TIMEOUT_SECONDS`：单次模型请求最长等待时间；
+- `LLM_MAX_ATTEMPTS`：包含首次调用在内的最多尝试次数；
+- `LLM_RETRY_BACKOFF_SECONDS`：首次重试前的等待时间，后续按指数增加。
+
+默认只尝试两次，避免外部服务持续故障时让请求长时间占用资源。流式回答已经向用户输出文字后不会从头重试，避免产生重复内容。
+
 ## 6. 数据持久化与备份
 
 Compose 将 `services/ai-core/data` 映射到容器 `/app/data`，因此删除容器不会

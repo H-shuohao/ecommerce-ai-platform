@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+import time
 from typing import Any
 
 from config import settings
@@ -38,8 +39,33 @@ class LLMService:
         self.client = Ark(
             base_url="https://ark.cn-beijing.volces.com/api/v3",
             api_key=api_key,
-            timeout=60,
+            timeout=settings.LLM_TIMEOUT_SECONDS,
         )
+
+    @staticmethod
+    def _sleep_before_retry(attempt: int) -> None:
+        delay = settings.LLM_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
+        if delay > 0:
+            time.sleep(delay)
+
+    def _create_with_retry(self, **kwargs: Any) -> Any:
+        """Retry a model request a bounded number of times before it starts streaming."""
+        last_error: Exception | None = None
+        for attempt in range(1, settings.LLM_MAX_ATTEMPTS + 1):
+            try:
+                return self.client.chat.completions.create(**kwargs)
+            except Exception as exc:
+                last_error = exc
+                if attempt >= settings.LLM_MAX_ATTEMPTS:
+                    break
+                print(
+                    f"[LLMService] 第{attempt}次调用失败，准备重试: "
+                    f"{type(exc).__name__}"
+                )
+                self._sleep_before_retry(attempt)
+        raise RuntimeError(
+            f"大模型调用在{settings.LLM_MAX_ATTEMPTS}次尝试后失败"
+        ) from last_error
 
     def chat_stream(
         self,
@@ -59,7 +85,7 @@ class LLMService:
 
         try:
             print(f"[LLMService] 发起流式调用，模型: {settings.ARK_ENDPOINT_ID}")
-            stream = self.client.chat.completions.create(
+            stream = self._create_with_retry(
                 model=settings.ARK_ENDPOINT_ID,
                 messages=messages,
                 temperature=0.1,
@@ -88,7 +114,7 @@ class LLMService:
             raise RuntimeError("大模型客户端未配置")
 
         try:
-            response = self.client.chat.completions.create(
+            response = self._create_with_retry(
                 model=settings.ARK_ENDPOINT_ID,
                 messages=messages,
                 temperature=temperature,
@@ -113,7 +139,7 @@ class LLMService:
             raise RuntimeError("大模型客户端未配置")
 
         try:
-            stream = self.client.chat.completions.create(
+            stream = self._create_with_retry(
                 model=settings.ARK_ENDPOINT_ID,
                 messages=messages,
                 temperature=temperature,
