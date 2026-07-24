@@ -80,10 +80,11 @@ Evaluation：使用固定题目检查工具选择、答案与耗时
 - **RTC 语音链路**：保留原项目 RTC、ASR、LLM/RAG、TTS 回调能力。
 - **容器化交付**：Dockerfile、Docker Compose、健康检查、端口映射和 SQLite 数据持久化。
 - **持续集成**：GitHub Actions 在独立 Python 3.13 环境中自动运行测试。
+- **接口安全**：可配置 API Key 认证，按 viewer、service、admin 三种角色隔离查询、Agent 执行和平台管理权限。
 
 ## 真实验证结果
 
-- 自动化测试：`55/55` 通过。
+- 自动化测试：`63/63` 通过。
 - 售前 Agent 基线评测：`4/4` 通过。
 - 工具选择准确率：`100%`。
 - 基线平均耗时：`6368.75 ms`（真实模型调用环境，结果会随网络与模型状态变化）。
@@ -173,6 +174,25 @@ cd services\ai-core
 
 客户端将完成 MCP 初始化、5个工具发现、数据目录资源读取、售前 Prompt 获取和库存工具调用。
 
+## API 认证与权限
+
+本地演示默认设置 `API_AUTH_ENABLED=false`，因此原有 Demo、Swagger 和测试命令不受影响。部署环境建议在 `.env` 中配置：
+
+```dotenv
+API_AUTH_ENABLED=true
+API_VIEWER_KEY=请替换为随机长密钥
+API_SERVICE_KEY=请替换为另一条随机长密钥
+API_ADMIN_KEY=请替换为第三条随机长密钥
+```
+
+启用后，请求需要携带 `X-API-Key`。Swagger 页面可点击右上角 **Authorize** 统一填写，无需在每个接口中重复输入。
+
+- `viewer`：读取商品、库存、订单和工具定义。
+- `service`：执行 Agent、RAG、RTC、内容任务、素材任务和 MCP 工具。
+- `admin`：访问数据中台和评测管理接口。
+
+真实密钥只能保存在本地或部署平台的 Secret 中，不能提交到 Git。
+
 ## 自动化测试
 
 测试必须从 `services/ai-core` 目录运行：
@@ -200,7 +220,7 @@ cd services\ai-core
 下一阶段优先级：
 
 1. 将固定Agent评测集从4条扩展到20～30条，并统计参数准确率、P50/P95耗时和失败类型；
-2. 使用PostgreSQL、Redis、JWT与角色权限增强后端生产化能力；
+2. 在现有 API Key 角色权限基础上增加用户登录、JWT 和细粒度资源授权；
 3. 增加结构化日志、超时/重试/限流、指标监控和压测报告；
 4. 打通上传、ASR、切片规划、FFmpeg裁剪和对象存储的直播素材闭环。
 

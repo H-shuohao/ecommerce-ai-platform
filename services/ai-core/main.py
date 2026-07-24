@@ -1,7 +1,8 @@
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from app.api.agents import router as agents_router
 from app.api.commerce import router as commerce_router
@@ -18,6 +19,13 @@ from app.api.web import router as web_router
 from config import settings
 from pathlib import Path
 from app.mcp.server import commerce_mcp
+from app.core.security import (
+    Role,
+    admin_access,
+    resolve_principal,
+    service_access,
+    viewer_access,
+)
 
 
 @asynccontextmanager
@@ -48,6 +56,26 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.middleware("http")
+async def protect_mcp_endpoint(request: Request, call_next):
+    if request.url.path.startswith("/mcp") and settings.API_AUTH_ENABLED:
+        try:
+            principal = resolve_principal(request.headers.get("X-API-Key"))
+        except HTTPException as error:
+            return JSONResponse(
+                status_code=error.status_code,
+                content={"detail": error.detail},
+                headers=error.headers,
+            )
+        if principal.role not in {Role.SERVICE, Role.ADMIN}:
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={"detail": "当前身份没有访问 MCP 的权限"},
+            )
+    return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -57,16 +85,16 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
-app.include_router(debug_router)
-app.include_router(rtc_router)
-app.include_router(commerce_router)
-app.include_router(tools_router)
-app.include_router(agents_router)
-app.include_router(content_agents_router)
-app.include_router(evaluations_router)
-app.include_router(data_platform_router)
-app.include_router(media_assets_router)
-app.include_router(live_clips_router)
+app.include_router(debug_router, dependencies=[Depends(service_access)])
+app.include_router(rtc_router, dependencies=[Depends(service_access)])
+app.include_router(commerce_router, dependencies=[Depends(viewer_access)])
+app.include_router(tools_router, dependencies=[Depends(viewer_access)])
+app.include_router(agents_router, dependencies=[Depends(service_access)])
+app.include_router(content_agents_router, dependencies=[Depends(service_access)])
+app.include_router(evaluations_router, dependencies=[Depends(admin_access)])
+app.include_router(data_platform_router, dependencies=[Depends(admin_access)])
+app.include_router(media_assets_router, dependencies=[Depends(service_access)])
+app.include_router(live_clips_router, dependencies=[Depends(service_access)])
 app.include_router(web_router)
 app.mount(
     "/static",

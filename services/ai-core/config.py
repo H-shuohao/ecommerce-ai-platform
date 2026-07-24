@@ -4,6 +4,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
+    API_AUTH_ENABLED = os.getenv("API_AUTH_ENABLED", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    API_VIEWER_KEY = os.getenv("API_VIEWER_KEY")
+    API_SERVICE_KEY = os.getenv("API_SERVICE_KEY")
+    API_ADMIN_KEY = os.getenv("API_ADMIN_KEY")
+
     VOLC_AK = os.getenv("VOLC_ACCESS_KEY")
     VOLC_SK = os.getenv("VOLC_SECRET_KEY")
     ARK_ENDPOINT_ID = os.getenv("ARK_ENDPOINT_ID")
