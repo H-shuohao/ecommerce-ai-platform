@@ -170,7 +170,7 @@ class ApiBaselineTests(unittest.TestCase):
         response = self.client.get("/api/v1/evaluations/presales/cases")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 4)
+        self.assertEqual(len(response.json()), 16)
         self.assertIn("expected_tools", response.json()[0])
 
     def test_list_presales_evaluation_history(self) -> None:
@@ -363,6 +363,67 @@ class ApiBaselineTests(unittest.TestCase):
         self.assertEqual(complete.call_count, 1)
         retrieve.assert_not_awaited()
         self.assertEqual(response.json()["run_id"], "run-test")
+        record_run.assert_called_once()
+
+    @patch("services.presales_agent_service.llm_service.complete")
+    @patch(
+        "services.presales_agent_service.rag_service.retrieve_result",
+        new_callable=AsyncMock,
+    )
+    @patch("app.api.agents.agent_run_repository.record", return_value="run-detail")
+    def test_presales_agent_routes_explicit_product_detail(
+        self,
+        record_run,
+        retrieve: AsyncMock,
+        complete,
+    ) -> None:
+        complete.return_value = "P2002 是便携蓝牙音箱。"
+        retrieve.return_value = RagResult(reason="no_result")
+
+        response = self.client.post(
+            "/api/v1/agents/presales/chat",
+            json={"question": "P2002是什么商品，有哪些特点？"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        calls = response.json()["tool_calls"]
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["tool"], "get_product")
+        self.assertEqual(calls[0]["arguments"]["product_id"], "P2002")
+        self.assertEqual(complete.call_count, 1)
+        retrieve.assert_not_awaited()
+        record_run.assert_called_once()
+
+    @patch("services.presales_agent_service.llm_service.complete")
+    @patch(
+        "services.presales_agent_service.rag_service.retrieve_result",
+        new_callable=AsyncMock,
+    )
+    @patch("app.api.agents.agent_run_repository.record", return_value="run-media")
+    def test_presales_agent_routes_explicit_media_search(
+        self,
+        record_run,
+        retrieve: AsyncMock,
+        complete,
+    ) -> None:
+        complete.return_value = "已完成P2001图片素材查询。"
+        retrieve.return_value = RagResult(reason="no_result")
+
+        response = self.client.post(
+            "/api/v1/agents/presales/chat",
+            json={"question": "查询P2001可以使用的图片素材"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        calls = response.json()["tool_calls"]
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["tool"], "search_media_assets")
+        self.assertEqual(
+            calls[0]["arguments"],
+            {"product_id": "P2001", "asset_type": "image"},
+        )
+        self.assertEqual(complete.call_count, 1)
+        retrieve.assert_not_awaited()
         record_run.assert_called_once()
 
     @patch("services.presales_agent_service.llm_service.complete")

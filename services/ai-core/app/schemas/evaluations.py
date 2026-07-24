@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class EvaluationCase(BaseModel):
@@ -19,6 +19,7 @@ class EvaluationCaseResult(BaseModel):
     answer: str | None = None
     duration_ms: int
     failures: list[str]
+    failure_types: list[str] = Field(default_factory=list)
 
 
 class EvaluationReport(BaseModel):
@@ -31,6 +32,9 @@ class EvaluationReport(BaseModel):
     pass_rate: float
     tool_selection_accuracy: float
     average_duration_ms: float
+    p50_duration_ms: float = 0.0
+    p95_duration_ms: float = 0.0
+    failure_summary: dict[str, int] = Field(default_factory=dict)
     results: list[EvaluationCaseResult]
 
 
@@ -44,6 +48,9 @@ class EvaluationRunSummary(BaseModel):
     pass_rate: float
     tool_selection_accuracy: float
     average_duration_ms: float
+    p50_duration_ms: float = 0.0
+    p95_duration_ms: float = 0.0
+    failure_summary: dict[str, int] = Field(default_factory=dict)
     created_at: str
 
 

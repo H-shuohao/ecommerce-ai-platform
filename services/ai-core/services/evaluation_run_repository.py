@@ -24,8 +24,9 @@ class EvaluationRunRepository:
                 INSERT INTO evaluation_runs
                 (id, suite_name, suite_version, total_cases, passed_cases,
                  failed_cases, pass_rate, tool_selection_accuracy,
-                 average_duration_ms, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 average_duration_ms, p50_duration_ms, p95_duration_ms,
+                 failure_summary_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run_id,
@@ -37,6 +38,9 @@ class EvaluationRunRepository:
                     report.pass_rate,
                     report.tool_selection_accuracy,
                     report.average_duration_ms,
+                    report.p50_duration_ms,
+                    report.p95_duration_ms,
+                    json.dumps(report.failure_summary, ensure_ascii=False),
                     created_at,
                 ),
             )
@@ -45,8 +49,9 @@ class EvaluationRunRepository:
                     """
                     INSERT INTO evaluation_case_results
                     (run_id, case_id, question, passed, expected_tools_json,
-                     actual_tools_json, answer, duration_ms, failures_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     actual_tools_json, answer, duration_ms, failures_json,
+                     failure_types_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         run_id,
@@ -58,6 +63,7 @@ class EvaluationRunRepository:
                         result.answer,
                         result.duration_ms,
                         json.dumps(result.failures, ensure_ascii=False),
+                        json.dumps(result.failure_types, ensure_ascii=False),
                     ),
                 )
         return run_id
@@ -74,6 +80,9 @@ class EvaluationRunRepository:
             pass_rate=row["pass_rate"],
             tool_selection_accuracy=row["tool_selection_accuracy"],
             average_duration_ms=row["average_duration_ms"],
+            p50_duration_ms=row["p50_duration_ms"],
+            p95_duration_ms=row["p95_duration_ms"],
+            failure_summary=json.loads(row["failure_summary_json"]),
             created_at=row["created_at"],
         )
 
@@ -108,6 +117,7 @@ class EvaluationRunRepository:
                 answer=row["answer"],
                 duration_ms=row["duration_ms"],
                 failures=json.loads(row["failures_json"]),
+                failure_types=json.loads(row["failure_types_json"]),
             )
             for row in rows
         ]

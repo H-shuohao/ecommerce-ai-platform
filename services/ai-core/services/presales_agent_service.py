@@ -73,6 +73,31 @@ class PresalesAgentService:
         return any(keyword in question for keyword in ("库存", "有货", "现货"))
 
     @staticmethod
+    def _requires_product_detail(question: str) -> bool:
+        return any(
+            keyword in question
+            for keyword in (
+                "介绍",
+                "详细",
+                "是什么商品",
+                "什么商品",
+                "哪些特点",
+                "多少钱",
+                "价格",
+            )
+        )
+
+    @staticmethod
+    def _find_media_asset_type(question: str) -> str | None:
+        if "视频" in question:
+            return "video"
+        if "图片" in question or "图像" in question:
+            return "image"
+        if "文本" in question or "文案" in question:
+            return "text"
+        return None
+
+    @staticmethod
     def _find_recent_product_id(
         question: str,
         history: list[dict[str, str]],
@@ -113,6 +138,18 @@ class PresalesAgentService:
                 or current_product_id
                 or self._find_recent_product_id(question, conversation_history)
             )
+        direct_detail_product_id = None
+        direct_media_product_id = None
+        direct_media_asset_type = None
+        if "素材" in question:
+            direct_media_product_id = self._find_product_id(question)
+            direct_media_asset_type = self._find_media_asset_type(question)
+        if (
+            not direct_inventory_product_id
+            and not direct_media_product_id
+            and self._requires_product_detail(question)
+        ):
+            direct_detail_product_id = self._find_product_id(question)
         if direct_inventory_product_id:
             arguments = {"product_id": direct_inventory_product_id}
             traces.append(
@@ -120,6 +157,26 @@ class PresalesAgentService:
                     tool="check_inventory",
                     arguments=arguments,
                     result=tool_registry.invoke("check_inventory", arguments),
+                )
+            )
+        elif direct_media_product_id:
+            arguments = {"product_id": direct_media_product_id}
+            if direct_media_asset_type:
+                arguments["asset_type"] = direct_media_asset_type
+            traces.append(
+                ToolCallTrace(
+                    tool="search_media_assets",
+                    arguments=arguments,
+                    result=tool_registry.invoke("search_media_assets", arguments),
+                )
+            )
+        elif direct_detail_product_id:
+            arguments = {"product_id": direct_detail_product_id}
+            traces.append(
+                ToolCallTrace(
+                    tool="get_product",
+                    arguments=arguments,
+                    result=tool_registry.invoke("get_product", arguments),
                 )
             )
         else:

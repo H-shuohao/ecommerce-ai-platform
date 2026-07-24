@@ -95,6 +95,9 @@ class Database:
                     pass_rate REAL NOT NULL,
                     tool_selection_accuracy REAL NOT NULL,
                     average_duration_ms REAL NOT NULL,
+                    p50_duration_ms REAL NOT NULL DEFAULT 0,
+                    p95_duration_ms REAL NOT NULL DEFAULT 0,
+                    failure_summary_json TEXT NOT NULL DEFAULT '{}',
                     created_at TEXT NOT NULL
                 );
 
@@ -109,6 +112,7 @@ class Database:
                     answer TEXT,
                     duration_ms INTEGER NOT NULL,
                     failures_json TEXT NOT NULL,
+                    failure_types_json TEXT NOT NULL DEFAULT '[]',
                     FOREIGN KEY (run_id) REFERENCES evaluation_runs(id) ON DELETE CASCADE
                 );
 
@@ -159,6 +163,40 @@ class Database:
                 self.connection.execute(
                     "ALTER TABLE conversation_sessions "
                     "ADD COLUMN current_product_id TEXT"
+                )
+            evaluation_columns = {
+                row["name"]
+                for row in self.connection.execute(
+                    "PRAGMA table_info(evaluation_runs)"
+                ).fetchall()
+            }
+            evaluation_migrations = {
+                "p50_duration_ms": (
+                    "ALTER TABLE evaluation_runs "
+                    "ADD COLUMN p50_duration_ms REAL NOT NULL DEFAULT 0"
+                ),
+                "p95_duration_ms": (
+                    "ALTER TABLE evaluation_runs "
+                    "ADD COLUMN p95_duration_ms REAL NOT NULL DEFAULT 0"
+                ),
+                "failure_summary_json": (
+                    "ALTER TABLE evaluation_runs "
+                    "ADD COLUMN failure_summary_json TEXT NOT NULL DEFAULT '{}'"
+                ),
+            }
+            for column, statement in evaluation_migrations.items():
+                if column not in evaluation_columns:
+                    self.connection.execute(statement)
+            result_columns = {
+                row["name"]
+                for row in self.connection.execute(
+                    "PRAGMA table_info(evaluation_case_results)"
+                ).fetchall()
+            }
+            if "failure_types_json" not in result_columns:
+                self.connection.execute(
+                    "ALTER TABLE evaluation_case_results "
+                    "ADD COLUMN failure_types_json TEXT NOT NULL DEFAULT '[]'"
                 )
 
 

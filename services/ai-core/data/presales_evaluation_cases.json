@@ -1,26 +1,108 @@
 [
   {
-    "id": "inventory-p1002",
+    "id": "inventory-p1002-spaced",
     "question": "请查询商品 P1002 当前是否有库存",
     "expected_tools": ["check_inventory"],
     "expected_arguments": {"check_inventory": {"product_id": "P1002"}}
   },
   {
-    "id": "order-status",
+    "id": "inventory-p1002-adjacent-chinese",
+    "question": "P1002现在有库存吗？",
+    "expected_tools": ["check_inventory"],
+    "expected_arguments": {"check_inventory": {"product_id": "P1002"}}
+  },
+  {
+    "id": "inventory-p2001",
+    "question": "帮我看看P2001有没有现货",
+    "expected_tools": ["check_inventory"],
+    "expected_arguments": {"check_inventory": {"product_id": "P2001"}}
+  },
+  {
+    "id": "inventory-p3001",
+    "question": "P3001还有货吗",
+    "expected_tools": ["check_inventory"],
+    "expected_arguments": {"check_inventory": {"product_id": "P3001"}}
+  },
+  {
+    "id": "order-shipped",
     "question": "帮我查询订单 O20260720001 的状态",
     "expected_tools": ["query_order"],
     "expected_arguments": {"query_order": {"order_id": "O20260720001"}}
   },
   {
-    "id": "oily-skin-recommendation",
-    "question": "请推荐适合油皮的商品",
-    "expected_tools": ["search_products"],
-    "expected_arguments": {}
+    "id": "order-paid",
+    "question": "订单O20260720002现在处理到哪一步了？",
+    "expected_tools": ["query_order"],
+    "expected_arguments": {"query_order": {"order_id": "O20260720002"}}
+  },
+  {
+    "id": "order-logistics",
+    "question": "请查一下O20260720001的物流信息",
+    "expected_tools": ["query_order"],
+    "expected_arguments": {"query_order": {"order_id": "O20260720001"}}
   },
   {
     "id": "product-detail-p1001",
     "question": "请介绍商品 P1001 的详细信息",
     "expected_tools": ["get_product"],
     "expected_arguments": {"get_product": {"product_id": "P1001"}}
+  },
+  {
+    "id": "product-detail-p2002",
+    "question": "P2002是什么商品，有哪些特点？",
+    "expected_tools": ["get_product"],
+    "expected_arguments": {"get_product": {"product_id": "P2002"}}
+  },
+  {
+    "id": "product-price-p3001",
+    "question": "商品P3001多少钱？",
+    "expected_tools": ["get_product"],
+    "expected_arguments": {"get_product": {"product_id": "P3001"}}
+  },
+  {
+    "id": "recommend-oily-skin",
+    "question": "请推荐适合油皮的商品",
+    "expected_tools": ["search_products"],
+    "expected_arguments": {}
+  },
+  {
+    "id": "recommend-sensitive-skin",
+    "question": "敏感肌晚上修护适合用什么？",
+    "expected_tools": ["search_products"],
+    "expected_arguments": {}
+  },
+  {
+    "id": "recommend-commute",
+    "question": "推荐一个适合日常通勤使用的商品",
+    "expected_tools": ["search_products"],
+    "expected_arguments": {}
+  },
+  {
+    "id": "search-digital",
+    "question": "帮我找数码类商品",
+    "expected_tools": ["search_products"],
+    "expected_arguments": {}
+  },
+  {
+    "id": "media-video-p1001",
+    "question": "帮我找商品P1001关联的视频素材",
+    "expected_tools": ["search_media_assets"],
+    "expected_arguments": {
+      "search_media_assets": {
+        "product_id": "P1001",
+        "asset_type": "video"
+      }
+    }
+  },
+  {
+    "id": "media-image-p2001",
+    "question": "查询P2001可以使用的图片素材",
+    "expected_tools": ["search_media_assets"],
+    "expected_arguments": {
+      "search_media_assets": {
+        "product_id": "P2001",
+        "asset_type": "image"
+      }
+    }
   }
 ]

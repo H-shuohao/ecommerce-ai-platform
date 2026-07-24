@@ -16,6 +16,9 @@ class EvaluationRunRepositoryTests(unittest.TestCase):
             pass_rate=100.0,
             tool_selection_accuracy=100.0,
             average_duration_ms=1200.0,
+            p50_duration_ms=1100.0,
+            p95_duration_ms=1500.0,
+            failure_summary={"missing_tool": 1},
             results=[
                 EvaluationCaseResult(
                     id="inventory-p1002",
@@ -26,6 +29,7 @@ class EvaluationRunRepositoryTests(unittest.TestCase):
                     answer="无库存",
                     duration_ms=1200,
                     failures=[],
+                    failure_types=[],
                 )
             ],
         )
@@ -37,6 +41,9 @@ class EvaluationRunRepositoryTests(unittest.TestCase):
         self.assertIsNotNone(stored)
         self.assertEqual(stored.run_id, run_id)
         self.assertEqual(stored.pass_rate, 100.0)
+        self.assertEqual(stored.p50_duration_ms, 1100.0)
+        self.assertEqual(stored.p95_duration_ms, 1500.0)
+        self.assertEqual(stored.failure_summary, {"missing_tool": 1})
         self.assertEqual(stored.results[0].actual_tools, ["check_inventory"])
         self.assertEqual(summaries[0].run_id, run_id)
         db.connection.close()
