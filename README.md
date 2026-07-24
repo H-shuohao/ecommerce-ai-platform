@@ -14,6 +14,7 @@
 [在线仓库](https://github.com/H-shuohao/ecommerce-ai-platform) ·
 [系统架构](docs/architecture/current-system.md) ·
 [八模块完成度](docs/architecture/eight-project-roadmap.md) ·
+[部署与排障手册](docs/deployment/runbook.md) ·
 [五分钟演示](docs/demo/five-minute-walkthrough.md) ·
 [真实评测记录](docs/evaluation/2026-07-21-presales-baseline.md)
 
@@ -87,7 +88,7 @@ Evaluation：使用固定题目检查工具选择、答案与耗时
 
 ## 真实验证结果
 
-- 自动化测试：`77/77` 通过。
+- 自动化测试：`81/81` 通过。
 - 售前 Agent 基线评测：`4/4` 通过。
 - 工具选择准确率：`100%`。
 - 基线平均耗时：`6368.75 ms`（真实模型调用环境，结果会随网络与模型状态变化）。
@@ -125,6 +126,19 @@ Copy-Item services\ai-core\.env.example services\ai-core\.env
 ```
 
 在本地`.env`中填写需要使用的外部服务配置；不要提交真实密钥。
+
+启动前可以运行不会打印密钥值的配置检查：
+
+```powershell
+cd services\ai-core
+.\.venv\Scripts\python.exe scripts\check_deployment_config.py
+```
+
+部署到公网环境时增加 `--production`，强制检查认证开关、分角色密钥和 HTTPS：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\check_deployment_config.py --production
+```
 
 ### 2. 安装依赖并启动
 
@@ -164,7 +178,11 @@ docker compose down
 - 对话演示：<http://127.0.0.1:8000/demo>
 - Swagger：<http://127.0.0.1:8000/docs>
 - 健康检查：<http://127.0.0.1:8000/health>
+- 业务就绪检查：<http://127.0.0.1:8000/ready>
 - MCP Streamable HTTP：`http://127.0.0.1:8000/mcp/`
+
+完整的启动、配置检查和故障排查步骤见
+[部署与故障排查手册](docs/deployment/runbook.md)。
 
 ## MCP 本地验证
 
