@@ -186,3 +186,26 @@ Compose 将 `services/ai-core/data` 映射到容器 `/app/data`，因此删除�
 > `/ready` 判断模型和知识库配置是否具备。部署前还有独立配置检查器，
 > 生产模式会强制认证开启并检查分角色密钥，且不会打印密钥内容。运行时通过
 > Docker 健康检查、结构化日志和 request_id 排查问题，数据目录通过卷持久化。
+
+## 8. 本地并发压测
+
+服务启动后，在 `services/ai-core` 目录运行不调用大模型的基础压测：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\load_test.py `
+  --profile commerce `
+  --requests 2000 `
+  --concurrency 20 `
+  --output ..\..\docs\performance\local-commerce.md
+```
+
+`agent`档位会真实调用Agent与大模型，可能产生费用，应该使用较小的请求数：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\load_test.py `
+  --profile agent `
+  --requests 5 `
+  --concurrency 2
+```
+
+启用API认证时，在当前终端临时设置 `LOAD_TEST_API_KEY`，不要把真实密钥写进脚本或报告。压测结果只代表本次机器、网络、数据和服务配置，不能直接当作生产容量。
