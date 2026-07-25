@@ -1,6 +1,13 @@
 import unittest
 
-from scripts.load_test import Sample, build_report, nearest_rank
+import httpx
+
+from scripts.load_test import (
+    Sample,
+    _validate_agent_response,
+    build_report,
+    nearest_rank,
+)
 
 
 class LoadTestMetricsTests(unittest.TestCase):
@@ -31,6 +38,51 @@ class LoadTestMetricsTests(unittest.TestCase):
         self.assertEqual(report.throughput_rps, 8)
         self.assertEqual(report.status_codes, {"200": 2, "429": 1})
         self.assertEqual(report.errors, {"ReadTimeout": 1})
+
+    def test_agent_response_requires_expected_tool(self) -> None:
+        valid = httpx.Response(
+            200,
+            json={
+                "answer": "P1002 当前无库存。",
+                "tool_calls": [{"tool": "check_inventory"}],
+            },
+        )
+        invalid = httpx.Response(
+            200,
+            json={
+                "answer": "我猜测当前有库存。",
+                "tool_calls": [],
+            },
+        )
+
+        self.assertIsNone(_validate_agent_response(valid, 0))
+        self.assertEqual(
+            _validate_agent_response(invalid, 0),
+            "ExpectedToolNotCalled:check_inventory",
+        )
+
+    def test_report_treats_application_validation_error_as_failure(self) -> None:
+        report = build_report(
+            profile="agent",
+            target_url="http://test",
+            total_requests=1,
+            concurrency=1,
+            samples=[
+                Sample(
+                    status_code=200,
+                    duration_ms=100,
+                    error="ExpectedToolNotCalled:check_inventory",
+                )
+            ],
+            wall_time_seconds=0.1,
+        )
+
+        self.assertEqual(report.successful_requests, 0)
+        self.assertEqual(report.failed_requests, 1)
+        self.assertEqual(
+            report.errors,
+            {"ExpectedToolNotCalled:check_inventory": 1},
+        )
 
 
 if __name__ == "__main__":

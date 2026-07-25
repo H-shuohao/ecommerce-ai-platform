@@ -66,7 +66,11 @@ def build_report(
     successful = sum(
         1
         for sample in samples
-        if sample.status_code is not None and 200 <= sample.status_code < 400
+        if (
+            sample.status_code is not None
+            and 200 <= sample.status_code < 400
+            and sample.error is None
+        )
     )
     failed = total_requests - successful
     status_codes = Counter(
@@ -98,19 +102,49 @@ def build_report(
     )
 
 
+AGENT_SCENARIOS: tuple[tuple[str, str], ...] = (
+    ("\u8bf7\u67e5\u8be2\u5546\u54c1 P1002 \u5f53\u524d\u662f\u5426\u6709\u5e93\u5b58", "check_inventory"),
+    ("\u5e2e\u6211\u67e5\u8be2\u8ba2\u5355 O20260720001 \u7684\u72b6\u6001", "query_order"),
+    ("\u8bf7\u63a8\u8350\u4e00\u6b3e\u9002\u5408\u6cb9\u76ae\u7684\u5546\u54c1", "search_products"),
+    ("\u8bf7\u4ecb\u7ecd\u5546\u54c1 P1001 \u7684\u8be6\u7ec6\u4fe1\u606f", "get_product"),
+)
+
+
 def _request_spec(profile: str, index: int) -> tuple[str, str, dict[str, Any] | None]:
     if profile == "commerce":
         return "GET", "/api/v1/products?keyword=油皮", None
     if profile == "agent":
+        question, _ = AGENT_SCENARIOS[index % len(AGENT_SCENARIOS)]
         return (
             "POST",
             "/api/v1/agents/presales/chat",
             {
-                "question": "请查询商品 P1002 当前是否有库存",
+                "question": question,
                 "session_id": f"load-test-{index}-{uuid4().hex[:8]}",
             },
         )
     raise ValueError(f"未知压测档位: {profile}")
+
+
+def _validate_agent_response(response: httpx.Response, index: int) -> str | None:
+    try:
+        payload = response.json()
+    except ValueError:
+        return "InvalidJsonResponse"
+    if not isinstance(payload, dict) or not str(payload.get("answer", "")).strip():
+        return "MissingAgentAnswer"
+    tool_calls = payload.get("tool_calls")
+    if not isinstance(tool_calls, list):
+        return "MissingToolCalls"
+    actual_tools = {
+        str(call.get("tool"))
+        for call in tool_calls
+        if isinstance(call, dict) and call.get("tool")
+    }
+    _, expected_tool = AGENT_SCENARIOS[index % len(AGENT_SCENARIOS)]
+    if expected_tool not in actual_tools:
+        return f"ExpectedToolNotCalled:{expected_tool}"
+    return None
 
 
 async def _run_one(
@@ -126,9 +160,13 @@ async def _run_one(
         try:
             response = await client.request(method, path, json=body)
             duration_ms = (time.perf_counter() - started_at) * 1000
+            validation_error = None
+            if 200 <= response.status_code < 400 and profile == "agent":
+                validation_error = _validate_agent_response(response, index)
             return Sample(
                 status_code=response.status_code,
                 duration_ms=round(duration_ms, 2),
+                error=validation_error,
             )
         except Exception as error:
             duration_ms = (time.perf_counter() - started_at) * 1000

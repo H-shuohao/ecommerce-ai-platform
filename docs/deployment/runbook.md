@@ -204,9 +204,13 @@ Compose 将 `services/ai-core/data` 映射到容器 `/app/data`，因此删除�
 ```powershell
 .\.venv\Scripts\python.exe scripts\load_test.py `
   --profile agent `
-  --requests 5 `
-  --concurrency 2
+  --requests 8 `
+  --concurrency 2 `
+  --timeout 90 `
+  --output ..\..\docs\performance\local-agent.md
 ```
+
+Agent 档位循环覆盖库存、订单、商品推荐和商品详情四类场景。成功条件不仅是 HTTP 2xx，还要求回答非空，并调用对应场景的预期工具。脚本会额外发送一次不计入报告的预热请求。
 
 启用API认证时，在当前终端临时设置 `LOAD_TEST_API_KEY`，不要把真实密钥写进脚本或报告。压测结果只代表本次机器、网络、数据和服务配置，不能直接当作生产容量。
 
