@@ -33,6 +33,7 @@ from app.core.observability import (
     unexpected_exception_handler,
     validation_exception_handler,
 )
+from app.core.rate_limiting import enforce_rate_limit
 from fastapi.exceptions import RequestValidationError
 
 
@@ -95,6 +96,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(enforce_rate_limit)
 app.middleware("http")(observe_request)
 
 app.include_router(health_router)

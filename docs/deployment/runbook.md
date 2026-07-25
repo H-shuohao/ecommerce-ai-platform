@@ -149,6 +149,27 @@ LLM_RETRY_BACKOFF_SECONDS=0.5
 
 默认只尝试两次，避免外部服务持续故障时让请求长时间占用资源。流式回答已经向用户输出文字后不会从头重试，避免产生重复内容。
 
+### 接口返回429
+
+429表示当前客户端在时间窗口内用完了请求额度。响应头会返回：
+
+```text
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 42
+Retry-After: 42
+```
+
+本地开发默认关闭限流；生产配置检查要求启用：
+
+```dotenv
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_REQUESTS=60
+RATE_LIMIT_WINDOW_SECONDS=60
+```
+
+当前实现适合单进程作品集部署。多实例生产环境需要改用Redis等共享存储，否则每个进程会分别计算额度。
+
 ## 6. 数据持久化与备份
 
 Compose 将 `services/ai-core/data` 映射到容器 `/app/data`，因此删除容器不会

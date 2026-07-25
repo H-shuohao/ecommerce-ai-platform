@@ -15,6 +15,7 @@ def valid_environment() -> dict[str, str]:
         "API_VIEWER_KEY": "viewer-key-123456",
         "API_SERVICE_KEY": "service-key-12345",
         "API_ADMIN_KEY": "admin-key-1234567",
+        "RATE_LIMIT_ENABLED": "true",
         "SERVER_URL": "https://ai.example.com",
     }
 
@@ -38,6 +39,18 @@ class DeploymentConfigServiceTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertIn(
             "生产模式必须设置 API_AUTH_ENABLED=true",
+            result.errors,
+        )
+
+    def test_production_requires_rate_limiting(self) -> None:
+        environment = valid_environment()
+        environment["RATE_LIMIT_ENABLED"] = "false"
+
+        result = validate_deployment_config(environment, production=True)
+
+        self.assertFalse(result.passed)
+        self.assertIn(
+            "生产模式必须设置 RATE_LIMIT_ENABLED=true",
             result.errors,
         )
 

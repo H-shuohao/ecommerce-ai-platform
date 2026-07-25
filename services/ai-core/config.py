@@ -22,6 +22,17 @@ class Config:
         0.0,
         float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "0.5")),
     )
+    RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    RATE_LIMIT_REQUESTS = max(1, int(os.getenv("RATE_LIMIT_REQUESTS", "60")))
+    RATE_LIMIT_WINDOW_SECONDS = max(
+        1,
+        int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
+    )
 
     VOLC_AK = os.getenv("VOLC_ACCESS_KEY")
     VOLC_SK = os.getenv("VOLC_SECRET_KEY")

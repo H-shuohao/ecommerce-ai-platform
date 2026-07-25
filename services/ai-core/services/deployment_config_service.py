@@ -77,6 +77,12 @@ def validate_deployment_config(
     if not server_url:
         warnings.append("未配置 SERVER_URL，RTC 公网回调不可用")
 
+    rate_limit_enabled = _enabled(environment.get("RATE_LIMIT_ENABLED"))
+    if production and not rate_limit_enabled:
+        errors.append("生产模式必须设置 RATE_LIMIT_ENABLED=true")
+    elif not rate_limit_enabled:
+        warnings.append("接口限流未启用，仅适合本地开发演示")
+
     return DeploymentCheckResult(
         passed=not errors,
         errors=errors,
