@@ -209,3 +209,23 @@ Compose 将 `services/ai-core/data` 映射到容器 `/app/data`，因此删除�
 ```
 
 启用API认证时，在当前终端临时设置 `LOAD_TEST_API_KEY`，不要把真实密钥写进脚本或报告。压测结果只代表本次机器、网络、数据和服务配置，不能直接当作生产容量。
+
+## 9. HTTP 指标监控
+
+服务运行后，可先请求几次 `/health`、`/api/v1/products` 或 Agent 接口，再在 Swagger 的“系统监控”分组执行：
+
+```text
+GET /api/v1/metrics/http
+```
+
+该接口返回当前进程启动以来的 HTTP 请求总数、正在处理数、成功数、4xx/5xx 数量、各状态码和请求方法分布，以及平均耗时、P50、P95、P99。它适合开发调试和面试演示。
+
+Prometheus 等监控系统可抓取：
+
+```text
+GET /metrics
+```
+
+该地址返回 Prometheus 文本格式，因此不以 Swagger JSON 的形式展示。启用 API 认证后，这两个监控出口都需要 `admin` 权限。
+
+当前实现是单进程内存指标：服务重启后统计会清零，多 worker 或多容器之间也不会自动合并。生产环境应由 Prometheus 定时抓取每个实例，再用 Grafana 展示和配置告警，不能把当前数值直接当成整个集群的统计。

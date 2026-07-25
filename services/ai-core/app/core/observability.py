@@ -11,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from config import settings
+from app.core.http_metrics import http_metrics
 
 
 request_id_context: ContextVar[str] = ContextVar("request_id", default="-")
@@ -65,8 +66,11 @@ async def observe_request(request: Request, call_next):
     request_id = _resolve_request_id(request)
     token = request_id_context.set(request_id)
     started_at = time.perf_counter()
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    http_metrics.start_request()
     try:
         response = await call_next(request)
+        status_code = response.status_code
         response.headers["X-Request-ID"] = request_id
         access_logger.info(
             "http_request_completed",
@@ -92,6 +96,11 @@ async def observe_request(request: Request, call_next):
         )
         raise
     finally:
+        http_metrics.finish_request(
+            method=request.method,
+            status_code=status_code,
+            duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+        )
         request_id_context.reset(token)
 
 

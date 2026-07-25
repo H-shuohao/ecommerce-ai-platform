@@ -13,6 +13,7 @@ from app.api.evaluations import router as evaluations_router
 from app.api.health import router as health_router
 from app.api.live_clips import router as live_clips_router
 from app.api.media_assets import router as media_assets_router
+from app.api.metrics import router as metrics_router
 from app.api.rtc import router as rtc_router
 from app.api.tools import router as tools_router
 from app.api.web import router as web_router
@@ -110,6 +111,7 @@ app.include_router(evaluations_router, dependencies=[Depends(admin_access)])
 app.include_router(data_platform_router, dependencies=[Depends(admin_access)])
 app.include_router(media_assets_router, dependencies=[Depends(service_access)])
 app.include_router(live_clips_router, dependencies=[Depends(service_access)])
+app.include_router(metrics_router, dependencies=[Depends(admin_access)])
 app.include_router(web_router)
 app.mount(
     "/static",
