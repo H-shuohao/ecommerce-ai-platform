@@ -10,8 +10,10 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: Literal["bearer"] = "bearer"
     expires_at: int
+    refresh_expires_at: int
     role: Literal["viewer", "service", "admin"]
 
 
@@ -36,3 +38,16 @@ class LoginAuditResponse(BaseModel):
     reason: str | None
     client_ip: str | None
     created_at: str
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=8, max_length=200)
+
+
+class SetAuthUserStatusRequest(BaseModel):
+    is_active: bool

@@ -91,11 +91,11 @@ Evaluation：使用固定题目检查工具选择、答案与耗时
 - **RTC 语音链路**：保留原项目 RTC、ASR、LLM/RAG、TTS 回调能力。
 - **容器化交付**：Dockerfile、Docker Compose、健康检查、端口映射和 SQLite 数据持久化。
 - **持续集成**：GitHub Actions 在独立 Python 3.13 环境中自动运行测试。
-- **双通道认证与RBAC**：程序间调用使用 API Key，网页登录使用带过期时间和HS256签名的JWT；数据库账号只保存PBKDF2密码哈希，并记录登录成功/失败审计，viewer、service、admin三种角色隔离查询、Agent执行和平台管理权限。
+- **双通道认证与RBAC**：程序间调用使用 API Key，网页登录使用 Access/Refresh JWT；数据库账号只保存PBKDF2密码哈希，并支持登录审计、账号停用和密码修改，令牌版本机制确保停用或改密后旧Token立即失效；viewer、service、admin三种角色隔离查询、Agent执行和平台管理权限。
 
 ## 真实验证结果
 
-- 自动化测试：`110/110` 通过。
+- 自动化测试：`112/112` 通过。
 - 售前 Agent v2真实评测：`16/16` 通过。
 - 工具选择准确率：`100%`。
 - 平均耗时：`2540.62 ms`；P50：`2319 ms`；P95：`4486 ms`（真实模型调用环境，结果会随网络与模型状态变化）。
@@ -308,7 +308,7 @@ cd services\ai-core
 下一阶段优先级：
 
 1. 将当前16条固定Agent评测集继续扩展到30条以上，增加多轮指代、边界输入和对抗性案例；
-2. 在现有 API Key、JWT、数据库账号和角色权限基础上增加刷新Token、账号停用与密码重置；
+2. 在现有 API Key、Access/Refresh JWT、数据库账号和角色权限基础上增加Refresh Token轮换、服务端撤销记录和密码找回；
 3. 在已完成结构化日志、模型超时/重试、单机限流、基础接口压测和 HTTP 指标监控的基础上，继续进行小规模真实 Agent 并发测试，并将指标接入 Prometheus/Grafana；
 4. 打通上传、ASR、切片规划、FFmpeg裁剪和对象存储的直播素材闭环。
 

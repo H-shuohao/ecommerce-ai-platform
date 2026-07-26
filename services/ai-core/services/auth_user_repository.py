@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime, timezone
 
-from app.core.jwt_auth import JwtUser
+from app.core.jwt_auth import JwtUser, verify_password
 from app.schemas.auth import AuthUserResponse, LoginAuditResponse
 from database import Database, database
 
@@ -45,7 +45,7 @@ class AuthUserRepository:
         with self.db.lock:
             row = self.db.connection.execute(
                 """
-                SELECT username, password_hash, role
+                SELECT username, password_hash, role, token_version
                 FROM auth_users
                 WHERE username = ? AND is_active = 1
                 """,
@@ -57,6 +57,74 @@ class AuthUserRepository:
             username=row["username"],
             password_hash=row["password_hash"],
             role=row["role"],
+            token_version=row["token_version"],
+        )
+
+    def get_token_state(self, username: str) -> tuple[bool, int] | None:
+        with self.db.lock:
+            row = self.db.connection.execute(
+                """
+                SELECT is_active, token_version
+                FROM auth_users WHERE username = ?
+                """,
+                (username.strip(),),
+            ).fetchone()
+        if row is None:
+            return None
+        return bool(row["is_active"]), int(row["token_version"])
+
+    def change_password(
+        self,
+        *,
+        username: str,
+        current_password: str,
+        new_password_hash: str,
+    ) -> bool:
+        user = self.get_login_user(username)
+        if user is None:
+            return False
+        if not verify_password(current_password, user.password_hash):
+            return False
+        now = datetime.now(timezone.utc).isoformat()
+        with self.db.lock, self.db.connection:
+            self.db.connection.execute(
+                """
+                UPDATE auth_users
+                SET password_hash = ?, token_version = token_version + 1,
+                    updated_at = ?
+                WHERE username = ? AND is_active = 1
+                """,
+                (new_password_hash, now, username.strip()),
+            )
+        return True
+
+    def set_active(self, *, username: str, is_active: bool) -> AuthUserResponse | None:
+        now = datetime.now(timezone.utc).isoformat()
+        with self.db.lock, self.db.connection:
+            cursor = self.db.connection.execute(
+                """
+                UPDATE auth_users
+                SET is_active = ?, token_version = token_version + 1,
+                    updated_at = ?
+                WHERE username = ?
+                """,
+                (int(is_active), now, username.strip()),
+            )
+            if cursor.rowcount == 0:
+                return None
+            row = self.db.connection.execute(
+                """
+                SELECT username, role, is_active, created_at, updated_at
+                FROM auth_users WHERE username = ?
+                """,
+                (username.strip(),),
+            ).fetchone()
+        return AuthUserResponse(
+            username=row["username"],
+            role=row["role"],
+            is_active=bool(row["is_active"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
         )
 
     def list_users(self, limit: int = 100) -> list[AuthUserResponse]:

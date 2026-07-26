@@ -76,7 +76,12 @@ class JwtLoginApiTests(unittest.TestCase):
             "app.api.auth.auth_user_repository",
             self.repository,
         )
+        self.security_repository_patcher = patch(
+            "app.core.security.auth_user_repository",
+            self.repository,
+        )
         self.repository_patcher.start()
+        self.security_repository_patcher.start()
         self.password_hash = hash_password(
             "demo-password",
             iterations=1000,
@@ -91,6 +96,7 @@ class JwtLoginApiTests(unittest.TestCase):
             "JWT_SECRET": "jwt-test-secret-with-enough-length",
             "JWT_ISSUER": "test-suite",
             "JWT_EXPIRES_MINUTES": 60,
+            "JWT_REFRESH_EXPIRES_DAYS": 7,
             "AUTH_USERS_JSON": json.dumps(
                 [
                     {
@@ -103,6 +109,7 @@ class JwtLoginApiTests(unittest.TestCase):
         }
 
     def tearDown(self) -> None:
+        self.security_repository_patcher.stop()
         self.repository_patcher.stop()
         self.database.connection.close()
 
@@ -223,6 +230,100 @@ class JwtLoginApiTests(unittest.TestCase):
         self.assertEqual(first.status_code, 201)
         self.assertEqual(second.status_code, 409)
         self.assertEqual(second.json()["detail"], "用户名已存在")
+
+    def test_refresh_and_account_disable_invalidate_tokens(self) -> None:
+        database_only_settings = {**self.auth_settings, "AUTH_USERS_JSON": "[]"}
+        with patch.multiple(
+            "app.core.security.settings",
+            **database_only_settings,
+        ):
+            self.client.post(
+                "/api/v1/auth/users",
+                headers={"X-API-Key": "admin-test-key"},
+                json={
+                    "username": "managed-user",
+                    "password": "database-password",
+                    "role": "viewer",
+                },
+            )
+            login = self.client.post(
+                "/api/v1/auth/login",
+                json={
+                    "username": "managed-user",
+                    "password": "database-password",
+                },
+            )
+            tokens = login.json()
+            refreshed = self.client.post(
+                "/api/v1/auth/refresh",
+                json={"refresh_token": tokens["refresh_token"]},
+            )
+            disabled = self.client.patch(
+                "/api/v1/auth/users/managed-user/status",
+                headers={"X-API-Key": "admin-test-key"},
+                json={"is_active": False},
+            )
+            protected = self.client.get(
+                "/api/v1/products",
+                headers={"Authorization": f"Bearer {tokens['access_token']}"},
+            )
+            rejected_refresh = self.client.post(
+                "/api/v1/auth/refresh",
+                json={"refresh_token": tokens["refresh_token"]},
+            )
+
+        self.assertEqual(login.status_code, 200)
+        self.assertEqual(refreshed.status_code, 200)
+        self.assertEqual(disabled.status_code, 200)
+        self.assertFalse(disabled.json()["is_active"])
+        self.assertEqual(protected.status_code, 401)
+        self.assertEqual(rejected_refresh.status_code, 401)
+
+    def test_change_password_invalidates_old_token_and_password(self) -> None:
+        database_only_settings = {**self.auth_settings, "AUTH_USERS_JSON": "[]"}
+        with patch.multiple(
+            "app.core.security.settings",
+            **database_only_settings,
+        ):
+            self.client.post(
+                "/api/v1/auth/users",
+                headers={"X-API-Key": "admin-test-key"},
+                json={
+                    "username": "password-user",
+                    "password": "old-password",
+                    "role": "viewer",
+                },
+            )
+            login = self.client.post(
+                "/api/v1/auth/login",
+                json={"username": "password-user", "password": "old-password"},
+            )
+            old_access_token = login.json()["access_token"]
+            changed = self.client.post(
+                "/api/v1/auth/change-password",
+                headers={"Authorization": f"Bearer {old_access_token}"},
+                json={
+                    "current_password": "old-password",
+                    "new_password": "new-password",
+                },
+            )
+            old_token_result = self.client.get(
+                "/api/v1/products",
+                headers={"Authorization": f"Bearer {old_access_token}"},
+            )
+            old_login = self.client.post(
+                "/api/v1/auth/login",
+                json={"username": "password-user", "password": "old-password"},
+            )
+            new_login = self.client.post(
+                "/api/v1/auth/login",
+                json={"username": "password-user", "password": "new-password"},
+            )
+
+        self.assertEqual(changed.status_code, 204)
+        self.assertEqual(old_token_result.status_code, 401)
+        self.assertEqual(old_login.status_code, 401)
+        self.assertEqual(new_login.status_code, 200)
 
 
 if __name__ == "__main__":

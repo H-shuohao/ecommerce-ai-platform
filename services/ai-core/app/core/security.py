@@ -7,6 +7,7 @@ from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBea
 
 from app.core.jwt_auth import JwtValidationError, decode_access_token
 from config import settings
+from services.auth_user_repository import auth_user_repository
 
 
 class Role(StrEnum):
@@ -68,6 +69,19 @@ def resolve_principal(
                 detail=str(error),
                 headers={"WWW-Authenticate": "Bearer"},
             ) from error
+        token_version = payload.get("token_version")
+        if token_version is not None:
+            state = auth_user_repository.get_token_state(str(payload["sub"]))
+            if (
+                state is None
+                or not state[0]
+                or state[1] != token_version
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="账号已停用或登录凭证已失效",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
         return Principal(
             name=str(payload["sub"]),
             role=Role(str(payload["role"])),

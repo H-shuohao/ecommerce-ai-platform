@@ -14,6 +14,7 @@ class JwtUser:
     username: str
     password_hash: str
     role: str
+    token_version: int | None = None
 
 
 class JwtValidationError(ValueError):
@@ -106,6 +107,8 @@ def create_access_token(
     secret: str,
     issuer: str,
     expires_minutes: int,
+    token_type: str = "access",
+    token_version: int | None = None,
     now: int | None = None,
 ) -> tuple[str, int]:
     issued_at = int(time.time()) if now is None else now
@@ -117,7 +120,10 @@ def create_access_token(
         "iss": issuer,
         "iat": issued_at,
         "exp": expires_at,
+        "token_type": token_type,
     }
+    if token_version is not None:
+        payload["token_version"] = token_version
     encoded_header = _base64url_encode(
         json.dumps(header, separators=(",", ":")).encode("utf-8")
     )
@@ -138,6 +144,7 @@ def decode_access_token(
     *,
     secret: str,
     issuer: str,
+    expected_type: str = "access",
     now: int | None = None,
 ) -> dict[str, Any]:
     try:
@@ -160,6 +167,8 @@ def decode_access_token(
     current_time = int(time.time()) if now is None else now
     if payload.get("iss") != issuer:
         raise JwtValidationError("JWT签发方无效")
+    if payload.get("token_type", "access") != expected_type:
+        raise JwtValidationError("JWT类型无效")
     if not isinstance(payload.get("exp"), int) or payload["exp"] <= current_time:
         raise JwtValidationError("JWT已过期")
     if not payload.get("sub") or payload.get("role") not in {

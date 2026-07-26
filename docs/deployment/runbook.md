@@ -289,6 +289,7 @@ JWT_AUTH_ENABLED=true
 JWT_SECRET=这里填写随机签名密钥
 JWT_ISSUER=ecommerce-ai-platform
 JWT_EXPIRES_MINUTES=60
+JWT_REFRESH_EXPIRES_DAYS=7
 AUTH_USERS_JSON=[]
 ```
 
@@ -316,7 +317,11 @@ POST /api/v1/auth/users
 POST /api/v1/auth/login
 ```
 
-请求体填写用户名和原始密码。成功响应中的 `access_token` 是短期JWT，不是密码哈希。点击 Swagger 右上角 `Authorize`，选择 `BearerAuth` 并填写该 Token，即可按用户角色访问接口。
+请求体填写用户名和原始密码。成功响应包含短期 `access_token` 和较长期 `refresh_token`，二者都不是密码哈希。点击 Swagger 右上角 `Authorize`，选择 `BearerAuth` 并填写 Access Token，即可按用户角色访问接口。Access Token 过期后，可以把 Refresh Token 提交到以下接口换取一对新 Token：
+
+```text
+POST /api/v1/auth/refresh
+```
 
 JWT包含用户名、角色、签发方和过期时间，但不包含密码。后端会验证HS256签名、签发方和过期时间。viewer Token可以读取商品，不能访问数据中台和监控管理接口；service可执行Agent；admin拥有平台管理权限。
 
@@ -325,8 +330,12 @@ JWT包含用户名、角色、签发方和过期时间，但不包含密码。�
 ```text
 GET /api/v1/auth/users
 GET /api/v1/auth/login-audits
+PATCH /api/v1/auth/users/{username}/status
+POST /api/v1/auth/change-password
 ```
 
-第一个接口用于查看数据库账号、角色和启用状态，第二个接口用于查看登录是否成功、失败原因、来源IP和时间。登录时优先读取数据库账号，找不到时才兼容读取 `AUTH_USERS_JSON`。
+前两个接口用于查看数据库账号以及登录成功/失败、来源IP和时间；状态接口由管理员停用或重新启用账号；修改密码接口要求用户携带自己的 Access Token 并提交当前密码。登录时优先读取数据库账号，找不到时才兼容读取 `AUTH_USERS_JSON`。
 
-当前已完成数据库用户表、密码哈希、角色权限和登录审计，仍未实现刷新Token、注销黑名单、账号停用接口、密码重置和多因素认证。生产系统应继续补充这些能力。
+数据库账号带有 `token_version`。管理员停用/启用账号或用户修改密码时，版本号会递增；后端校验 Token 时会同时检查账号状态和版本，因此操作前签发的 Access/Refresh Token 会立即失效。
+
+当前已完成数据库用户表、密码哈希、角色权限、登录审计、Access/Refresh Token、账号停用和用户主动改密。仍未实现 Refresh Token 单次轮换与服务端黑名单、忘记密码流程和多因素认证，生产系统应继续补充这些能力。

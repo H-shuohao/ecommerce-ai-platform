@@ -157,6 +157,7 @@ class Database:
                     password_hash TEXT NOT NULL,
                     role TEXT NOT NULL CHECK (role IN ('viewer', 'service', 'admin')),
                     is_active INTEGER NOT NULL DEFAULT 1,
+                    token_version INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
@@ -221,6 +222,17 @@ class Database:
                 self.connection.execute(
                     "ALTER TABLE evaluation_case_results "
                     "ADD COLUMN failure_types_json TEXT NOT NULL DEFAULT '[]'"
+                )
+            auth_user_columns = {
+                row["name"]
+                for row in self.connection.execute(
+                    "PRAGMA table_info(auth_users)"
+                ).fetchall()
+            }
+            if "token_version" not in auth_user_columns:
+                self.connection.execute(
+                    "ALTER TABLE auth_users "
+                    "ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0"
                 )
 
 
