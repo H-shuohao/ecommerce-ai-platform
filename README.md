@@ -86,7 +86,7 @@ Evaluation：使用固定题目检查工具选择、答案与耗时
 - **接口限流**：按客户端或脱敏后的 API Key 统计固定时间窗口配额，超限返回429、剩余额度和重试时间，健康检查不受影响。
 - **可重复压测**：异步压测脚本支持商品接口与真实Agent两种档位，统计成功率、吞吐量、平均耗时和P50/P95/P99；Agent 档位还会校验回答非空且调用了场景预期工具，避免只看 HTTP 200。
 - **HTTP 指标监控**：进程内汇总请求量、并发处理中请求、状态码、成功/失败数及 P50/P95/P99 延迟；Prometheus 定时采集并保存时间序列，Grafana 自动加载预置仪表盘。
-- **Prometheus 告警规则**：针对服务不可用、5xx 错误率过高和 P95 延迟过高进行持续时间判定，并在 Grafana 展示当前告警数量。
+- **告警闭环**：Prometheus 针对服务不可用、5xx 错误率过高和 P95 延迟过高进行判定；Alertmanager 完成分组、去重、静默与路由，并把 `firing/resolved` 通知发送到可持久化的本地 Webhook 收件箱。
 - **可配置告警判定**：达到最小样本量后，依据 P95 延迟、5xx 错误率和在途请求数返回 healthy/warning/critical，并列出触发规则；当前未接外部消息通知。
 - **标准 MCP Server**：通过 Streamable HTTP 暴露5个 Tools、1个 Resource和1个 Prompt。
 - **RTC 语音链路**：保留原项目 RTC、ASR、LLM/RAG、TTS 回调能力。
@@ -96,7 +96,7 @@ Evaluation：使用固定题目检查工具选择、答案与耗时
 
 ## 真实验证结果
 
-- 自动化测试：`114/114` 通过。
+- 自动化测试：AI Core `114/114` 通过，告警 Webhook `2/2` 通过。
 - 售前 Agent v3真实评测：`30/30` 通过。
 - 工具选择准确率：`100%`。
 - 平均耗时：`2490.6 ms`；P50：`2082 ms`；P95：`4334 ms`（真实模型调用环境，结果会随网络与模型状态变化）。
@@ -186,6 +186,8 @@ docker compose down
 Docker Compose 还会启动 Prometheus 和 Grafana：
 
 - Prometheus：<http://127.0.0.1:9090>
+- Alertmanager：<http://127.0.0.1:9093>
+- 告警收件箱：<http://127.0.0.1:9087>
 - Grafana：<http://127.0.0.1:3000>（本地默认账号/密码：`admin` / `admin`）
 - 预置仪表盘：**Dashboards → AI Platform → AI Core HTTP Overview**
 

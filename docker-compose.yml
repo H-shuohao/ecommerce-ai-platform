@@ -26,6 +26,32 @@ services:
       - prometheus-data:/prometheus
     depends_on:
       - ai-core
+      - alertmanager
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: ecommerce-alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    depends_on:
+      - alert-webhook
+    restart: unless-stopped
+
+  alert-webhook:
+    build:
+      context: ./monitoring/alert-webhook
+    container_name: ecommerce-alert-webhook
+    ports:
+      - "9087:9087"
+    volumes:
+      - alert-webhook-data:/data
     restart: unless-stopped
 
   grafana:
@@ -48,3 +74,5 @@ services:
 volumes:
   prometheus-data:
   grafana-data:
+  alertmanager-data:
+  alert-webhook-data:
