@@ -261,3 +261,45 @@ METRIC_ALERT_IN_FLIGHT_CRITICAL=50
 ```
 
 当前功能负责“发现并描述异常”，没有主动发送邮件、微信或钉钉消息。生产环境通常由 Prometheus Alertmanager 或云监控读取指标后负责通知、静默和升级。
+
+## 11. JWT 用户登录
+
+系统保留两种认证方式：
+
+- API Key：适合后端服务、MCP客户端和自动化脚本；
+- Bearer JWT：适合用户登录后访问HTTP接口。
+
+JWT默认关闭。先在 `services/ai-core` 目录运行密码哈希生成器，输入过程不会显示密码：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\generate_password_hash.py
+```
+
+再生成至少32位的随机签名密钥：
+
+```powershell
+.\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+把输出填写到本地 `.env`，不要提交真实值：
+
+```text
+API_AUTH_ENABLED=true
+JWT_AUTH_ENABLED=true
+JWT_SECRET=这里填写随机签名密钥
+JWT_ISSUER=ecommerce-ai-platform
+JWT_EXPIRES_MINUTES=60
+AUTH_USERS_JSON=[{"username":"demo-viewer","password_hash":"这里填写密码哈希","role":"viewer"}]
+```
+
+重新启动服务后，在 Swagger 调用：
+
+```text
+POST /api/v1/auth/login
+```
+
+请求体填写用户名和原始密码。成功响应中的 `access_token` 是短期JWT，不是密码哈希。点击 Swagger 右上角 `Authorize`，选择 `BearerAuth` 并填写该 Token，即可按用户角色访问接口。
+
+JWT包含用户名、角色、签发方和过期时间，但不包含密码。后端会验证HS256签名、签发方和过期时间。viewer Token可以读取商品，不能访问数据中台和监控管理接口；service可执行Agent；admin拥有平台管理权限。
+
+当前是作品集所需的最小账号体系：用户配置来自环境变量，尚未实现数据库用户表、刷新Token、注销黑名单、密码重置和多因素认证。生产系统应继续补充这些能力。

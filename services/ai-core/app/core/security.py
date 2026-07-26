@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import APIKeyHeader
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 
+from app.core.jwt_auth import JwtValidationError, decode_access_token
 from config import settings
 
 
@@ -26,6 +27,11 @@ api_key_header = APIKeyHeader(
     description="部署环境启用认证后，在此填写 viewer、service 或 admin API Key。",
     auto_error=False,
 )
+bearer_scheme = HTTPBearer(
+    scheme_name="BearerAuth",
+    description="网页登录后填写JWT access_token。",
+    auto_error=False,
+)
 
 
 def _configured_principals() -> tuple[tuple[str, Role, str | None], ...]:
@@ -36,15 +42,42 @@ def _configured_principals() -> tuple[tuple[str, Role, str | None], ...]:
     )
 
 
-def resolve_principal(api_key: str | None) -> Principal:
+def resolve_principal(
+    api_key: str | None,
+    bearer_token: str | None = None,
+) -> Principal:
     if not settings.API_AUTH_ENABLED:
         return Principal(name="local-development", role=Role.ADMIN)
+
+    if bearer_token:
+        if not settings.JWT_AUTH_ENABLED or not settings.JWT_SECRET:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="JWT认证未配置",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        try:
+            payload = decode_access_token(
+                bearer_token,
+                secret=settings.JWT_SECRET,
+                issuer=settings.JWT_ISSUER,
+            )
+        except JwtValidationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=str(error),
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from error
+        return Principal(
+            name=str(payload["sub"]),
+            role=Role(str(payload["role"])),
+        )
 
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="缺少 API Key",
-            headers={"WWW-Authenticate": "ApiKey"},
+            detail="缺少 API Key 或 Bearer Token",
+            headers={"WWW-Authenticate": "ApiKey, Bearer"},
         )
 
     for name, role, configured_key in _configured_principals():
@@ -58,8 +91,12 @@ def resolve_principal(api_key: str | None) -> Principal:
     )
 
 
-def authenticate(api_key: str | None = Depends(api_key_header)) -> Principal:
-    return resolve_principal(api_key)
+def authenticate(
+    api_key: str | None = Depends(api_key_header),
+    bearer: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> Principal:
+    token = bearer.credentials if bearer is not None else None
+    return resolve_principal(api_key, token)
 
 
 def require_roles(*allowed_roles: Role):

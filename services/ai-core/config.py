@@ -13,6 +13,16 @@ class Config:
     API_VIEWER_KEY = os.getenv("API_VIEWER_KEY")
     API_SERVICE_KEY = os.getenv("API_SERVICE_KEY")
     API_ADMIN_KEY = os.getenv("API_ADMIN_KEY")
+    JWT_AUTH_ENABLED = os.getenv("JWT_AUTH_ENABLED", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    JWT_SECRET = os.getenv("JWT_SECRET")
+    JWT_ISSUER = os.getenv("JWT_ISSUER", "ecommerce-ai-platform")
+    JWT_EXPIRES_MINUTES = max(1, int(os.getenv("JWT_EXPIRES_MINUTES", "60")))
+    AUTH_USERS_JSON = os.getenv("AUTH_USERS_JSON", "[]")
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
     CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", "60"))
     CACHE_MAX_ENTRIES = int(os.getenv("CACHE_MAX_ENTRIES", "256"))

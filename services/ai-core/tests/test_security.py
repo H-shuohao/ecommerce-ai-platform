@@ -23,7 +23,7 @@ class ApiSecurityTests(unittest.TestCase):
         response = self.client.get("/api/v1/products")
 
         self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json()["detail"], "缺少 API Key")
+        self.assertEqual(response.json()["detail"], "缺少 API Key 或 Bearer Token")
         self.assertTrue(response.headers["X-Request-ID"])
 
     @patch.multiple("app.core.security.settings", **AUTH_SETTINGS)
@@ -72,7 +72,7 @@ class ApiSecurityTests(unittest.TestCase):
         response = self.client.get("/mcp")
 
         self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json()["detail"], "缺少 API Key")
+        self.assertEqual(response.json()["detail"], "缺少 API Key 或 Bearer Token")
         self.assertTrue(response.headers["X-Request-ID"])
 
     @patch.multiple("app.core.security.settings", **AUTH_SETTINGS)

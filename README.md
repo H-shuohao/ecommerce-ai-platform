@@ -91,11 +91,11 @@ Evaluation：使用固定题目检查工具选择、答案与耗时
 - **RTC 语音链路**：保留原项目 RTC、ASR、LLM/RAG、TTS 回调能力。
 - **容器化交付**：Dockerfile、Docker Compose、健康检查、端口映射和 SQLite 数据持久化。
 - **持续集成**：GitHub Actions 在独立 Python 3.13 环境中自动运行测试。
-- **接口安全**：可配置 API Key 认证，按 viewer、service、admin 三种角色隔离查询、Agent 执行和平台管理权限。
+- **双通道认证与RBAC**：程序间调用使用 API Key，网页登录使用带过期时间和HS256签名的JWT；密码保存为PBKDF2哈希，viewer、service、admin三种角色隔离查询、Agent执行和平台管理权限。
 
 ## 真实验证结果
 
-- 自动化测试：`102/102` 通过。
+- 自动化测试：`108/108` 通过。
 - 售前 Agent v2真实评测：`16/16` 通过。
 - 工具选择准确率：`100%`。
 - 平均耗时：`2540.62 ms`；P50：`2319 ms`；P95：`4486 ms`（真实模型调用环境，结果会随网络与模型状态变化）。

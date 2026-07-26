@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from app.api.agents import router as agents_router
+from app.api.auth import router as auth_router
 from app.api.commerce import router as commerce_router
 from app.api.content_agents import router as content_agents_router
 from app.api.debug import router as debug_router
@@ -101,6 +102,7 @@ app.middleware("http")(enforce_rate_limit)
 app.middleware("http")(observe_request)
 
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(debug_router, dependencies=[Depends(service_access)])
 app.include_router(rtc_router, dependencies=[Depends(service_access)])
 app.include_router(commerce_router, dependencies=[Depends(viewer_access)])

@@ -71,6 +71,17 @@ def validate_deployment_config(
     else:
         warnings.append("API认证未启用，仅适合本地开发演示")
 
+    jwt_enabled = _enabled(environment.get("JWT_AUTH_ENABLED"))
+    if jwt_enabled:
+        jwt_secret = environment.get("JWT_SECRET", "").strip()
+        if len(jwt_secret) < 32:
+            errors.append("JWT_SECRET 至少需要32位")
+        users_json = environment.get("AUTH_USERS_JSON", "").strip()
+        if not users_json or users_json == "[]":
+            errors.append("JWT登录已启用但 AUTH_USERS_JSON 未配置用户")
+    else:
+        warnings.append("JWT登录未启用，仅保留API Key机器认证")
+
     server_url = environment.get("SERVER_URL", "").strip()
     if server_url and production and not server_url.startswith("https://"):
         errors.append("生产环境 SERVER_URL 必须使用 https://")
