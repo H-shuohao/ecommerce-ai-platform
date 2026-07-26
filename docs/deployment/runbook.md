@@ -233,3 +233,31 @@ GET /metrics
 该地址返回 Prometheus 文本格式，因此不以 Swagger JSON 的形式展示。启用 API 认证后，这两个监控出口都需要 `admin` 权限。
 
 当前实现是单进程内存指标：服务重启后统计会清零，多 worker 或多容器之间也不会自动合并。生产环境应由 Prometheus 定时抓取每个实例，再用 Grafana 展示和配置告警，不能把当前数值直接当成整个集群的统计。
+
+## 10. 指标告警判定
+
+在 Swagger 的“系统监控”分组执行：
+
+```text
+GET /api/v1/metrics/alerts
+```
+
+响应中的 `status` 有三个等级：
+
+- `healthy`：当前没有规则达到阈值；
+- `warning`：需要关注，但未达到严重阈值；
+- `critical`：P95、5xx错误率或正在处理的请求数达到严重阈值。
+
+`evaluated=false` 表示当前样本数不足，系统暂不下结论，避免刚启动时一个慢请求造成误报警。默认至少累计20个请求才开始判定。阈值可通过以下环境变量调整：
+
+```text
+METRIC_ALERT_MINIMUM_SAMPLES=20
+METRIC_ALERT_P95_WARNING_MS=3000
+METRIC_ALERT_P95_CRITICAL_MS=5000
+METRIC_ALERT_ERROR_RATE_WARNING_PERCENT=1
+METRIC_ALERT_ERROR_RATE_CRITICAL_PERCENT=5
+METRIC_ALERT_IN_FLIGHT_WARNING=20
+METRIC_ALERT_IN_FLIGHT_CRITICAL=50
+```
+
+当前功能负责“发现并描述异常”，没有主动发送邮件、微信或钉钉消息。生产环境通常由 Prometheus Alertmanager 或云监控读取指标后负责通知、静默和升级。

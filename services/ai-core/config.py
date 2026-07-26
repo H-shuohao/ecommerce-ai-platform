@@ -33,6 +33,34 @@ class Config:
         1,
         int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
     )
+    METRIC_ALERT_MINIMUM_SAMPLES = max(
+        1,
+        int(os.getenv("METRIC_ALERT_MINIMUM_SAMPLES", "20")),
+    )
+    METRIC_ALERT_P95_WARNING_MS = max(
+        0.0,
+        float(os.getenv("METRIC_ALERT_P95_WARNING_MS", "3000")),
+    )
+    METRIC_ALERT_P95_CRITICAL_MS = max(
+        METRIC_ALERT_P95_WARNING_MS,
+        float(os.getenv("METRIC_ALERT_P95_CRITICAL_MS", "5000")),
+    )
+    METRIC_ALERT_ERROR_RATE_WARNING_PERCENT = max(
+        0.0,
+        float(os.getenv("METRIC_ALERT_ERROR_RATE_WARNING_PERCENT", "1")),
+    )
+    METRIC_ALERT_ERROR_RATE_CRITICAL_PERCENT = max(
+        METRIC_ALERT_ERROR_RATE_WARNING_PERCENT,
+        float(os.getenv("METRIC_ALERT_ERROR_RATE_CRITICAL_PERCENT", "5")),
+    )
+    METRIC_ALERT_IN_FLIGHT_WARNING = max(
+        1,
+        int(os.getenv("METRIC_ALERT_IN_FLIGHT_WARNING", "20")),
+    )
+    METRIC_ALERT_IN_FLIGHT_CRITICAL = max(
+        METRIC_ALERT_IN_FLIGHT_WARNING,
+        int(os.getenv("METRIC_ALERT_IN_FLIGHT_CRITICAL", "50")),
+    )
 
     VOLC_AK = os.getenv("VOLC_ACCESS_KEY")
     VOLC_SK = os.getenv("VOLC_SECRET_KEY")
