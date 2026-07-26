@@ -1,9 +1,11 @@
 import unittest
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 from app.core.http_metrics import HttpMetricsRegistry, http_metrics
 from app.core.metric_alerts import evaluate_http_metrics
+from config import settings
 from main import app
 
 
@@ -106,6 +108,17 @@ class HttpMetricsApiTests(unittest.TestCase):
             response.text,
         )
         self.assertIn("ai_core_http_requests_in_flight", response.text)
+
+    def test_scrape_endpoint_remains_available_when_api_auth_is_enabled(self) -> None:
+        self.client.get("/health")
+
+        with patch.object(settings, "API_AUTH_ENABLED", True):
+            admin_response = self.client.get("/api/v1/metrics/http")
+            scrape_response = self.client.get("/metrics")
+
+        self.assertEqual(admin_response.status_code, 401)
+        self.assertEqual(scrape_response.status_code, 200)
+        self.assertNotIn("request_body", scrape_response.text)
 
     def test_alert_endpoint_returns_not_evaluated_for_small_sample(self) -> None:
         self.client.get("/health")

@@ -113,7 +113,7 @@ app.include_router(evaluations_router, dependencies=[Depends(admin_access)])
 app.include_router(data_platform_router, dependencies=[Depends(admin_access)])
 app.include_router(media_assets_router, dependencies=[Depends(service_access)])
 app.include_router(live_clips_router, dependencies=[Depends(service_access)])
-app.include_router(metrics_router, dependencies=[Depends(admin_access)])
+app.include_router(metrics_router)
 app.include_router(web_router)
 app.mount(
     "/static",

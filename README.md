@@ -85,7 +85,7 @@ Evaluation：使用固定题目检查工具选择、答案与耗时
 - **模型调用韧性**：模型请求支持可配置超时、有限次数重试与指数退避；流式请求仅在尚未输出内容前重试，避免重复文本。
 - **接口限流**：按客户端或脱敏后的 API Key 统计固定时间窗口配额，超限返回429、剩余额度和重试时间，健康检查不受影响。
 - **可重复压测**：异步压测脚本支持商品接口与真实Agent两种档位，统计成功率、吞吐量、平均耗时和P50/P95/P99；Agent 档位还会校验回答非空且调用了场景预期工具，避免只看 HTTP 200。
-- **HTTP 指标监控**：进程内汇总请求量、并发处理中请求、状态码、成功/失败数及 P50/P95/P99 延迟，同时提供 Swagger JSON 与 Prometheus 文本出口。
+- **HTTP 指标监控**：进程内汇总请求量、并发处理中请求、状态码、成功/失败数及 P50/P95/P99 延迟；Prometheus 定时采集并保存时间序列，Grafana 自动加载预置仪表盘。
 - **可配置告警判定**：达到最小样本量后，依据 P95 延迟、5xx 错误率和在途请求数返回 healthy/warning/critical，并列出触发规则；当前未接外部消息通知。
 - **标准 MCP Server**：通过 Streamable HTTP 暴露5个 Tools、1个 Resource和1个 Prompt。
 - **RTC 语音链路**：保留原项目 RTC、ASR、LLM/RAG、TTS 回调能力。
@@ -95,7 +95,7 @@ Evaluation：使用固定题目检查工具选择、答案与耗时
 
 ## 真实验证结果
 
-- 自动化测试：`113/113` 通过。
+- 自动化测试：`114/114` 通过。
 - 售前 Agent v3真实评测：`30/30` 通过。
 - 工具选择准确率：`100%`。
 - 平均耗时：`2490.6 ms`；P50：`2082 ms`；P95：`4334 ms`（真实模型调用环境，结果会随网络与模型状态变化）。
@@ -181,6 +181,15 @@ docker compose down
 ```
 
 开发模式与 Docker 模式不要同时启动，否则都会占用8000端口。
+
+Docker Compose 还会启动 Prometheus 和 Grafana：
+
+- Prometheus：<http://127.0.0.1:9090>
+- Grafana：<http://127.0.0.1:3000>（本地默认账号/密码：`admin` / `admin`）
+- 预置仪表盘：**Dashboards → AI Platform → AI Core HTTP Overview**
+
+监控链路、指标含义、安全边界与排障方式见
+[Prometheus 与 Grafana 监控说明](docs/observability/prometheus-grafana.md)。
 
 ## 访问入口
 
@@ -309,7 +318,7 @@ cd services\ai-core
 
 1. 对当前30条固定Agent评测集运行真实模型基线，针对失败案例优化提示词、确定性路由和工具参数；
 2. 在现有 API Key、Access/Refresh JWT、数据库账号和角色权限基础上增加Refresh Token轮换、服务端撤销记录和密码找回；
-3. 在已完成结构化日志、模型超时/重试、单机限流、基础接口压测和 HTTP 指标监控的基础上，继续进行小规模真实 Agent 并发测试，并将指标接入 Prometheus/Grafana；
+3. 在已完成结构化日志、模型超时/重试、单机限流、真实 Agent 并发测试和 Prometheus/Grafana 仪表盘的基础上，补充告警规则与外部通知通道；
 4. 打通上传、ASR、切片规划、FFmpeg裁剪和对象存储的直播素材闭环。
 
 所有简历指标必须来自真实测试或运行记录，不虚构并发量、准确率、用户规模和商业收益。
