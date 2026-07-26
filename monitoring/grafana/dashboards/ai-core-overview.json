@@ -163,6 +163,42 @@
       ],
       "title": "HTTP 延迟分位数",
       "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 24, "x": 0, "y": 15},
+      "id": 7,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "sum(ALERTS{service=\"ai-core\",alertstate=\"firing\"}) or vector(0)",
+          "legendFormat": "正在触发的告警数",
+          "refId": "A"
+        }
+      ],
+      "title": "AI Core 告警状态（0 为正常）",
+      "type": "stat"
     }
   ],
   "refresh": "5s",
@@ -174,5 +210,5 @@
   "timezone": "browser",
   "title": "AI Core HTTP Overview",
   "uid": "ai-core-http",
-  "version": 1
+  "version": 2
 }
