@@ -8,6 +8,8 @@ class EvaluationCase(BaseModel):
     question: str
     expected_tools: list[str]
     expected_arguments: dict[str, dict[str, Any]]
+    history: list[dict[str, str]] = Field(default_factory=list)
+    forbidden_tools: list[str] = Field(default_factory=list)
 
 
 class EvaluationCaseResult(BaseModel):

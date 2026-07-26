@@ -170,7 +170,7 @@ class ApiBaselineTests(unittest.TestCase):
         response = self.client.get("/api/v1/evaluations/presales/cases")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 16)
+        self.assertEqual(len(response.json()), 30)
         self.assertIn("expected_tools", response.json()[0])
 
     def test_list_presales_evaluation_history(self) -> None:

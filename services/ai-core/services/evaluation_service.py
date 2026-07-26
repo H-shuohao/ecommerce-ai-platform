@@ -57,6 +57,12 @@ class EvaluationService:
                 continue
             matched_tools += 1
 
+        actual_tool_names = {call.tool for call in response.tool_calls}
+        forbidden_calls = sorted(actual_tool_names.intersection(case.forbidden_tools))
+        if forbidden_calls:
+            failures.append(f"调用了禁止工具: {', '.join(forbidden_calls)}")
+            failure_types.append("forbidden_tool")
+
         if not response.answer.strip():
             failures.append("最终回答为空")
             failure_types.append("empty_answer")
@@ -79,7 +85,7 @@ class EvaluationService:
         for case in cases:
             started_at = time.perf_counter()
             try:
-                response = await self.agent.run(case.question, history=[])
+                response = await self.agent.run(case.question, history=case.history)
                 failures, failure_types, case_matched_tools = self._evaluate_case(
                     case,
                     response,
@@ -116,7 +122,7 @@ class EvaluationService:
             for failure_type in result.failure_types
         )
         report = EvaluationReport(
-            suite_version="v2",
+            suite_version="v3",
             total_cases=total_cases,
             passed_cases=passed_cases,
             failed_cases=total_cases - passed_cases,
