@@ -78,7 +78,10 @@ def validate_deployment_config(
             errors.append("JWT_SECRET 至少需要32位")
         users_json = environment.get("AUTH_USERS_JSON", "").strip()
         if not users_json or users_json == "[]":
-            errors.append("JWT登录已启用但 AUTH_USERS_JSON 未配置用户")
+            warnings.append(
+                "JWT登录已启用且未配置环境变量启动账号，请确认数据库已有用户，"
+                "或使用admin API Key创建首个用户"
+            )
     else:
         warnings.append("JWT登录未启用，仅保留API Key机器认证")
 

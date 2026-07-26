@@ -151,6 +151,30 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_media_assets_product_type
                 ON media_assets(product_id, asset_type, created_at DESC);
+
+                CREATE TABLE IF NOT EXISTS auth_users (
+                    username TEXT PRIMARY KEY,
+                    password_hash TEXT NOT NULL,
+                    role TEXT NOT NULL CHECK (role IN ('viewer', 'service', 'admin')),
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS login_audits (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL,
+                    success INTEGER NOT NULL,
+                    reason TEXT,
+                    client_ip TEXT,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_login_audits_created
+                ON login_audits(created_at DESC);
+
+                CREATE INDEX IF NOT EXISTS idx_login_audits_username
+                ON login_audits(username, created_at DESC);
                 """
             )
             session_columns = {

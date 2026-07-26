@@ -11,7 +11,9 @@ from app.core.jwt_auth import (
     hash_password,
     verify_password,
 )
+from database import Database
 from main import app
+from services.auth_user_repository import AuthUserRepository
 
 
 class JwtPrimitiveTests(unittest.TestCase):
@@ -68,6 +70,13 @@ class JwtPrimitiveTests(unittest.TestCase):
 class JwtLoginApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = TestClient(app)
+        self.database = Database(":memory:")
+        self.repository = AuthUserRepository(self.database)
+        self.repository_patcher = patch(
+            "app.api.auth.auth_user_repository",
+            self.repository,
+        )
+        self.repository_patcher.start()
         self.password_hash = hash_password(
             "demo-password",
             iterations=1000,
@@ -92,6 +101,10 @@ class JwtLoginApiTests(unittest.TestCase):
                 ]
             ),
         }
+
+    def tearDown(self) -> None:
+        self.repository_patcher.stop()
+        self.database.connection.close()
 
     def test_login_and_use_bearer_token(self) -> None:
         with patch.multiple("app.core.security.settings", **self.auth_settings):
@@ -138,6 +151,78 @@ class JwtLoginApiTests(unittest.TestCase):
             response.json()["detail"],
             "当前身份没有访问该接口的权限",
         )
+
+    def test_admin_creates_database_user_and_login_is_audited(self) -> None:
+        database_only_settings = {
+            **self.auth_settings,
+            "AUTH_USERS_JSON": "[]",
+        }
+        with patch.multiple(
+            "app.core.security.settings",
+            **database_only_settings,
+        ):
+            created = self.client.post(
+                "/api/v1/auth/users",
+                headers={"X-API-Key": "admin-test-key"},
+                json={
+                    "username": "service-user",
+                    "password": "database-password",
+                    "role": "service",
+                },
+            )
+            login = self.client.post(
+                "/api/v1/auth/login",
+                json={
+                    "username": "service-user",
+                    "password": "database-password",
+                },
+            )
+            failed_login = self.client.post(
+                "/api/v1/auth/login",
+                json={
+                    "username": "service-user",
+                    "password": "wrong-password",
+                },
+            )
+            audits = self.client.get(
+                "/api/v1/auth/login-audits",
+                headers={"X-API-Key": "admin-test-key"},
+            )
+
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["role"], "service")
+        self.assertNotIn("password", created.json())
+        self.assertEqual(login.status_code, 200)
+        self.assertEqual(login.json()["role"], "service")
+        self.assertEqual(failed_login.status_code, 401)
+        self.assertEqual(audits.status_code, 200)
+        self.assertEqual(len(audits.json()), 2)
+        self.assertEqual(
+            {item["success"] for item in audits.json()},
+            {True, False},
+        )
+
+    def test_duplicate_database_username_returns_conflict(self) -> None:
+        with patch.multiple("app.core.security.settings", **self.auth_settings):
+            request = {
+                "username": "duplicate-user",
+                "password": "database-password",
+                "role": "viewer",
+            }
+            first = self.client.post(
+                "/api/v1/auth/users",
+                headers={"X-API-Key": "admin-test-key"},
+                json=request,
+            )
+            second = self.client.post(
+                "/api/v1/auth/users",
+                headers={"X-API-Key": "admin-test-key"},
+                json=request,
+            )
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(second.json()["detail"], "用户名已存在")
 
 
 if __name__ == "__main__":

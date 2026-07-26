@@ -281,7 +281,7 @@ JWT默认关闭。先在 `services/ai-core` 目录运行密码哈希生成器，
 .\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-把输出填写到本地 `.env`，不要提交真实值：
+把输出填写到本地 `.env`，不要提交真实值。`AUTH_USERS_JSON` 只作为兼容或首次启动账号来源，可以暂时保持空数组：
 
 ```text
 API_AUTH_ENABLED=true
@@ -289,10 +289,28 @@ JWT_AUTH_ENABLED=true
 JWT_SECRET=这里填写随机签名密钥
 JWT_ISSUER=ecommerce-ai-platform
 JWT_EXPIRES_MINUTES=60
-AUTH_USERS_JSON=[{"username":"demo-viewer","password_hash":"这里填写密码哈希","role":"viewer"}]
+AUTH_USERS_JSON=[]
 ```
 
-重新启动服务后，在 Swagger 调用：
+重新启动服务后，先使用 admin API Key 在 Swagger 创建数据库账号：
+
+```text
+POST /api/v1/auth/users
+```
+
+示例请求体：
+
+```json
+{
+  "username": "demo-viewer",
+  "password": "请填写至少8位的测试密码",
+  "role": "viewer"
+}
+```
+
+这里传入的是原始密码，但后端写入 SQLite 前会转换为 PBKDF2 哈希；接口响应和用户列表都不会返回密码或密码哈希。首个数据库账号也可以暂时通过 `AUTH_USERS_JSON` 启动账号登录，但后续账号建议统一由管理接口创建。
+
+创建账号后调用：
 
 ```text
 POST /api/v1/auth/login
@@ -302,4 +320,13 @@ POST /api/v1/auth/login
 
 JWT包含用户名、角色、签发方和过期时间，但不包含密码。后端会验证HS256签名、签发方和过期时间。viewer Token可以读取商品，不能访问数据中台和监控管理接口；service可执行Agent；admin拥有平台管理权限。
 
-当前是作品集所需的最小账号体系：用户配置来自环境变量，尚未实现数据库用户表、刷新Token、注销黑名单、密码重置和多因素认证。生产系统应继续补充这些能力。
+管理员还可以调用以下接口：
+
+```text
+GET /api/v1/auth/users
+GET /api/v1/auth/login-audits
+```
+
+第一个接口用于查看数据库账号、角色和启用状态，第二个接口用于查看登录是否成功、失败原因、来源IP和时间。登录时优先读取数据库账号，找不到时才兼容读取 `AUTH_USERS_JSON`。
+
+当前已完成数据库用户表、密码哈希、角色权限和登录审计，仍未实现刷新Token、注销黑名单、账号停用接口、密码重置和多因素认证。生产系统应继续补充这些能力。

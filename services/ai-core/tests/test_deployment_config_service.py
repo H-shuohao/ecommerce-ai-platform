@@ -76,7 +76,7 @@ class DeploymentConfigServiceTests(unittest.TestCase):
         self.assertTrue(any("ARK_API_KEY" in error for error in result.errors))
         self.assertTrue(any("VOLC_ACCOUNT_ID" in error for error in result.errors))
 
-    def test_enabled_jwt_requires_secret_and_users(self) -> None:
+    def test_enabled_jwt_requires_secret_and_warns_without_bootstrap_user(self) -> None:
         environment = valid_environment()
         environment["JWT_AUTH_ENABLED"] = "true"
         environment["JWT_SECRET"] = "short"
@@ -86,4 +86,4 @@ class DeploymentConfigServiceTests(unittest.TestCase):
 
         self.assertFalse(result.passed)
         self.assertTrue(any("JWT_SECRET" in error for error in result.errors))
-        self.assertTrue(any("AUTH_USERS_JSON" in error for error in result.errors))
+        self.assertTrue(any("数据库已有用户" in warning for warning in result.warnings))
