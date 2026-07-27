@@ -85,6 +85,28 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_content_drafts_status_created
                 ON content_drafts(status, created_at DESC);
 
+                CREATE TABLE IF NOT EXISTS content_generation_jobs (
+                    id TEXT PRIMARY KEY,
+                    idempotency_key TEXT UNIQUE,
+                    product_id TEXT NOT NULL,
+                    platform TEXT NOT NULL,
+                    tone TEXT NOT NULL,
+                    status TEXT NOT NULL
+                        CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
+                    draft_id TEXT,
+                    error TEXT,
+                    attempt_count INTEGER NOT NULL DEFAULT 0,
+                    max_attempts INTEGER NOT NULL DEFAULT 3,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    started_at TEXT,
+                    finished_at TEXT,
+                    FOREIGN KEY (draft_id) REFERENCES content_drafts(id) ON DELETE SET NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_content_generation_jobs_status_created
+                ON content_generation_jobs(status, created_at DESC);
+
                 CREATE TABLE IF NOT EXISTS evaluation_runs (
                     id TEXT PRIMARY KEY,
                     suite_name TEXT NOT NULL,

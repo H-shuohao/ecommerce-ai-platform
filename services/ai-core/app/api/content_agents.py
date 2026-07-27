@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, status
 
 from app.schemas.content_agents import (
     ContentDraft,
@@ -6,12 +6,16 @@ from app.schemas.content_agents import (
     ContentComplianceResult,
     ContentGenerateRequest,
     ContentGenerateResponse,
+    ContentGenerationJob,
+    ContentJobStatus,
     ContentReviewRequest,
 )
 from app.schemas.media_assets import MediaAssetCreate
 from services.content_agent_service import content_agent_service
 from services.content_compliance_service import content_compliance_service
 from services.content_draft_repository import content_draft_repository
+from services.content_job_repository import content_job_repository
+from services.content_job_service import content_job_service
 from services.media_asset_service import media_asset_service
 
 
@@ -39,6 +43,68 @@ async def generate_content(request: ContentGenerateRequest) -> ContentGenerateRe
         raise HTTPException(status_code=400, detail=str(error)) from error
     except RuntimeError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
+
+
+@router.post(
+    "/jobs",
+    response_model=ContentGenerationJob,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="异步提交内容生成任务",
+)
+async def create_content_generation_job(
+    request: ContentGenerateRequest,
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="X-Idempotency-Key",
+        min_length=1,
+        max_length=100,
+    ),
+) -> ContentGenerationJob:
+    return content_job_service.submit(
+        product_id=request.product_id,
+        platform=request.platform,
+        tone=request.tone,
+        idempotency_key=idempotency_key,
+    )
+
+
+@router.get(
+    "/jobs",
+    response_model=list[ContentGenerationJob],
+    summary="查询内容生成任务列表",
+)
+async def list_content_generation_jobs(
+    job_status: ContentJobStatus | None = Query(default=None, alias="status"),
+    limit: int = Query(default=20, ge=1, le=100),
+) -> list[ContentGenerationJob]:
+    return content_job_repository.list(status=job_status, limit=limit)
+
+
+@router.get(
+    "/jobs/{job_id}",
+    response_model=ContentGenerationJob,
+    summary="查询内容生成任务状态",
+)
+async def get_content_generation_job(job_id: str) -> ContentGenerationJob:
+    job = content_job_repository.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="内容生成任务不存在")
+    return job
+
+
+@router.post(
+    "/jobs/{job_id}/retry",
+    response_model=ContentGenerationJob,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="重试失败的内容生成任务",
+)
+async def retry_content_generation_job(job_id: str) -> ContentGenerationJob:
+    try:
+        return content_job_service.retry(job_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @router.get(

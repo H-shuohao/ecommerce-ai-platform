@@ -5,12 +5,30 @@ from pydantic import BaseModel, Field, model_validator
 
 ContentPlatform = Literal["xiaohongshu", "douyin", "wechat"]
 ContentTone = Literal["professional", "friendly", "energetic"]
+ContentJobStatus = Literal["queued", "running", "succeeded", "failed"]
 
 
 class ContentGenerateRequest(BaseModel):
     product_id: str = Field(min_length=1, max_length=50)
     platform: ContentPlatform
     tone: ContentTone = "friendly"
+
+
+class ContentGenerationJob(BaseModel):
+    id: str
+    product_id: str
+    platform: ContentPlatform
+    tone: ContentTone
+    status: ContentJobStatus
+    draft_id: str | None = None
+    error: str | None = None
+    attempt_count: int
+    max_attempts: int
+    idempotency_key: str | None = None
+    created_at: str
+    updated_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
 
 
 class ContentGenerateResponse(BaseModel):
