@@ -10,6 +10,9 @@ httpx==0.27.2
 # 数据模型与校验（AI 开发的核心）
 pydantic==2.9.2
 
+# Multipart file uploads for the multimodal asset center
+python-multipart==0.0.20
+
 # 如果需要处理环境变量（如 API_KEY）
 python-dotenv==1.0.1
 

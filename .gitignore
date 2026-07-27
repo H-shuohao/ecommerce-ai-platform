@@ -25,6 +25,9 @@ logs/
 *.db-shm
 *.db-wal
 uploads/
+services/ai-core/data/assets/
+services/ai-core/data/test-assets/
+services/ai-core/data/test-tmp/
 
 # Private career preparation (kept outside the public repository)
 docs/interview/

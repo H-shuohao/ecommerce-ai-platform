@@ -166,6 +166,12 @@ class Database:
                     product_id TEXT,
                     source TEXT NOT NULL,
                     tags_json TEXT NOT NULL,
+                    storage_provider TEXT NOT NULL DEFAULT 'external'
+                        CHECK (storage_provider IN ('external', 'local')),
+                    original_filename TEXT,
+                    content_type TEXT,
+                    size_bytes INTEGER,
+                    sha256 TEXT,
                     status TEXT NOT NULL CHECK (status IN ('active', 'archived')),
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
@@ -245,6 +251,35 @@ class Database:
                     "ALTER TABLE evaluation_case_results "
                     "ADD COLUMN failure_types_json TEXT NOT NULL DEFAULT '[]'"
                 )
+            media_asset_columns = {
+                row["name"]
+                for row in self.connection.execute(
+                    "PRAGMA table_info(media_assets)"
+                ).fetchall()
+            }
+            media_asset_migrations = {
+                "storage_provider": (
+                    "ALTER TABLE media_assets ADD COLUMN "
+                    "storage_provider TEXT NOT NULL DEFAULT 'external'"
+                ),
+                "original_filename": (
+                    "ALTER TABLE media_assets ADD COLUMN original_filename TEXT"
+                ),
+                "content_type": (
+                    "ALTER TABLE media_assets ADD COLUMN content_type TEXT"
+                ),
+                "size_bytes": (
+                    "ALTER TABLE media_assets ADD COLUMN size_bytes INTEGER"
+                ),
+                "sha256": "ALTER TABLE media_assets ADD COLUMN sha256 TEXT",
+            }
+            for column, statement in media_asset_migrations.items():
+                if column not in media_asset_columns:
+                    self.connection.execute(statement)
+            self.connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_media_assets_sha256 "
+                "ON media_assets(sha256)"
+            )
             auth_user_columns = {
                 row["name"]
                 for row in self.connection.execute(

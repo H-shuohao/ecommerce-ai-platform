@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -46,6 +47,11 @@ class Config:
         1,
         int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
     )
+    ASSET_STORAGE_DIR = os.getenv(
+        "ASSET_STORAGE_DIR",
+        str(Path(__file__).resolve().parent / "data" / "assets"),
+    )
+    ASSET_MAX_UPLOAD_MB = max(1, int(os.getenv("ASSET_MAX_UPLOAD_MB", "50")))
     METRIC_ALERT_MINIMUM_SAMPLES = max(
         1,
         int(os.getenv("METRIC_ALERT_MINIMUM_SAMPLES", "20")),

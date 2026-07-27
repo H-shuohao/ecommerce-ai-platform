@@ -8,8 +8,7 @@ class MediaAssetService:
         self.repository = repository
 
     def create(self, request: MediaAssetCreate) -> MediaAsset:
-        if request.product_id and commerce_service.get_product(request.product_id) is None:
-            raise KeyError(f"商品不存在: {request.product_id}")
+        self.validate_product(request.product_id)
         existing = self.repository.get_by_uri(request.uri)
         if existing is not None:
             return existing
@@ -17,6 +16,11 @@ class MediaAssetService:
             update={"tags": list(dict.fromkeys(tag.strip() for tag in request.tags if tag.strip()))}
         )
         return self.repository.create(normalized)
+
+    @staticmethod
+    def validate_product(product_id: str | None) -> None:
+        if product_id and commerce_service.get_product(product_id) is None:
+            raise KeyError(f"商品不存在: {product_id}")
 
     def get(self, asset_id: str) -> MediaAsset | None:
         return self.repository.get(asset_id)

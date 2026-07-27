@@ -20,6 +20,11 @@ class MediaAssetRepository:
             product_id=row["product_id"],
             source=row["source"],
             tags=json.loads(row["tags_json"]),
+            storage_provider=row["storage_provider"],
+            original_filename=row["original_filename"],
+            content_type=row["content_type"],
+            size_bytes=row["size_bytes"],
+            sha256=row["sha256"],
             status=row["status"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
@@ -33,8 +38,9 @@ class MediaAssetRepository:
                 """
                 INSERT INTO media_assets
                 (id, asset_type, title, uri, product_id, source, tags_json,
-                 status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+                 storage_provider, original_filename, content_type, size_bytes,
+                 sha256, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
                 """,
                 (
                     asset_id,
@@ -44,6 +50,11 @@ class MediaAssetRepository:
                     request.product_id,
                     request.source,
                     json.dumps(request.tags, ensure_ascii=False),
+                    request.storage_provider,
+                    request.original_filename,
+                    request.content_type,
+                    request.size_bytes,
+                    request.sha256,
                     now,
                     now,
                 ),
