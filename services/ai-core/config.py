@@ -52,6 +52,16 @@ class Config:
         str(Path(__file__).resolve().parent / "data" / "assets"),
     )
     ASSET_MAX_UPLOAD_MB = max(1, int(os.getenv("ASSET_MAX_UPLOAD_MB", "50")))
+    FFMPEG_BINARY = os.getenv("FFMPEG_BINARY", "ffmpeg").strip() or "ffmpeg"
+    FFPROBE_BINARY = os.getenv("FFPROBE_BINARY", "ffprobe").strip() or "ffprobe"
+    FFMPEG_TIMEOUT_SECONDS = max(
+        1.0,
+        float(os.getenv("FFMPEG_TIMEOUT_SECONDS", "120")),
+    )
+    LIVE_CLIP_MAX_DURATION_SECONDS = max(
+        1.0,
+        float(os.getenv("LIVE_CLIP_MAX_DURATION_SECONDS", "300")),
+    )
     METRIC_ALERT_MINIMUM_SAMPLES = max(
         1,
         int(os.getenv("METRIC_ALERT_MINIMUM_SAMPLES", "20")),

@@ -115,6 +115,78 @@ class MediaStorageService:
         finally:
             await upload.close()
 
+    def reserve_temporary_path(self, suffix: str) -> Path:
+        normalized_suffix = suffix.strip().lower()
+        allowed_suffixes = {item[1] for item in self._CONTENT_TYPES.values()}
+        if normalized_suffix not in allowed_suffixes:
+            raise AssetFileError(f"不支持的临时文件扩展名: {normalized_suffix}")
+        return self.temp_root / f"{uuid4().hex}{normalized_suffix}"
+
+    def store_generated_file(
+        self,
+        temporary_path: str | Path,
+        *,
+        content_type: str,
+        original_filename: str,
+    ) -> StoredAssetFile:
+        normalized_content_type = content_type.split(";", 1)[0].strip().lower()
+        type_and_suffix = self._CONTENT_TYPES.get(normalized_content_type)
+        if type_and_suffix is None:
+            raise AssetFileError(f"不支持的生成文件类型: {normalized_content_type}")
+
+        candidate = Path(temporary_path).resolve()
+        if candidate.parent != self.temp_root.resolve():
+            raise AssetFileError("生成文件必须位于受控临时目录")
+        if not candidate.is_file():
+            raise AssetFileError("生成文件不存在")
+
+        asset_type, suffix = type_and_suffix
+        digest = hashlib.sha256()
+        size_bytes = 0
+        first_bytes = b""
+        try:
+            with candidate.open("rb") as source:
+                while chunk := source.read(1024 * 1024):
+                    size_bytes += len(chunk)
+                    if size_bytes > self.max_bytes:
+                        raise AssetFileTooLargeError(
+                            f"生成文件超过 {self.max_bytes // 1024 // 1024} MB 限制"
+                        )
+                    if not first_bytes:
+                        first_bytes = chunk[:16]
+                    digest.update(chunk)
+
+            if size_bytes == 0:
+                raise AssetFileError("生成文件不能为空")
+            if not self._signature_matches(normalized_content_type, first_bytes):
+                raise AssetFileError("生成文件内容与声明的 Content-Type 不匹配")
+
+            sha256 = digest.hexdigest()
+            target = self.root / f"{sha256}{suffix}"
+            deduplicated = target.exists()
+            if deduplicated:
+                candidate.unlink(missing_ok=True)
+            else:
+                try:
+                    candidate.replace(target)
+                except FileExistsError:
+                    candidate.unlink(missing_ok=True)
+                    deduplicated = True
+
+            return StoredAssetFile(
+                uri=f"{self.URI_PREFIX}{target.name}",
+                path=target,
+                asset_type=asset_type,
+                original_filename=self._safe_filename(original_filename),
+                content_type=normalized_content_type,
+                size_bytes=size_bytes,
+                sha256=sha256,
+                deduplicated=deduplicated,
+            )
+        except Exception:
+            candidate.unlink(missing_ok=True)
+            raise
+
     def resolve(self, uri: str) -> Path:
         if not uri.startswith(self.URI_PREFIX):
             raise AssetFileError("该素材只登记了外部地址，没有本地文件")

@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field, model_validator
 
+from app.schemas.media_assets import MediaAsset
+
 
 class TranscriptSegment(BaseModel):
     start_seconds: float = Field(ge=0)
@@ -34,4 +36,15 @@ class LiveClipPlanResponse(BaseModel):
     source_video_uri: str
     clips: list[LiveClip]
     physical_cut_completed: bool = False
+    human_review_required: bool = True
+
+
+class LiveClipExecutionResponse(BaseModel):
+    planned_asset_id: str
+    source_asset_id: str
+    start_seconds: float
+    end_seconds: float
+    duration_seconds: float
+    output_asset: MediaAsset
+    physical_cut_completed: bool = True
     human_review_required: bool = True

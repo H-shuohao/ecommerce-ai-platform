@@ -25,6 +25,9 @@ class MediaAssetService:
     def get(self, asset_id: str) -> MediaAsset | None:
         return self.repository.get(asset_id)
 
+    def get_by_uri(self, uri: str) -> MediaAsset | None:
+        return self.repository.get_by_uri(uri)
+
     def list(self, **filters) -> list[MediaAsset]:
         return self.repository.list(**filters)
 
