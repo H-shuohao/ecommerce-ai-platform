@@ -53,12 +53,30 @@ class LiveClipExecutionResponse(BaseModel):
 
 
 LiveClipPipelineStatus = Literal["queued", "running", "succeeded", "failed"]
+LiveClipPipelineStage = Literal[
+    "queued",
+    "transcribing",
+    "planning",
+    "cutting",
+    "completed",
+    "failed",
+]
 
 
 class LiveClipPipelineRequest(BaseModel):
     product_id: str = Field(min_length=1, max_length=50)
     source_asset_id: str = Field(min_length=1, max_length=100)
-    transcript: list[TranscriptSegment] = Field(min_length=1, max_length=500)
+    transcript: list[TranscriptSegment] = Field(
+        default_factory=list,
+        max_length=500,
+        description="可选。留空时由批量 ASR 自动生成带时间戳的转写。",
+    )
+    transcript_language: str = Field(
+        default="zh",
+        min_length=2,
+        max_length=20,
+        description="ASR 语言代码，例如 zh、en；手工提供转写时仅作记录。",
+    )
     max_clips: int = Field(default=3, ge=1, le=5)
 
 
@@ -68,8 +86,10 @@ class LiveClipPipelineJob(BaseModel):
     product_id: str
     source_asset_id: str
     transcript_segment_count: int
+    transcript_source: Literal["provided", "asr"]
     max_clips: int
     status: LiveClipPipelineStatus
+    stage: LiveClipPipelineStage
     planned_asset_ids: list[str]
     output_asset_ids: list[str]
     error: str | None = None

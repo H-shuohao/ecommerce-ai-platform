@@ -91,6 +91,16 @@ def validate_deployment_config(
     if not server_url:
         warnings.append("未配置 SERVER_URL，RTC 公网回调不可用")
 
+    asr_provider = environment.get("ASR_PROVIDER", "disabled").strip().lower()
+    if asr_provider == "openai-compatible":
+        asr_missing = _missing(environment, ("ASR_API_URL", "ASR_API_KEY"))
+        if asr_missing:
+            errors.append("批量ASR配置缺失: " + ", ".join(asr_missing))
+    elif asr_provider == "disabled":
+        warnings.append("批量ASR未启用，直播切片任务需要手工提供转写")
+    else:
+        errors.append(f"不支持的ASR_PROVIDER: {asr_provider}")
+
     rate_limit_enabled = _enabled(environment.get("RATE_LIMIT_ENABLED"))
     if production and not rate_limit_enabled:
         errors.append("生产模式必须设置 RATE_LIMIT_ENABLED=true")

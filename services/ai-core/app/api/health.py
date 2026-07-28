@@ -37,6 +37,10 @@ async def readiness() -> JSONResponse:
             settings.RTC_ROOM_ID,
             settings.RTC_USER_ID,
         ),
+        "batch_asr": (
+            settings.ASR_PROVIDER == "openai-compatible"
+            and configured(settings.ASR_API_URL, settings.ASR_API_KEY)
+        ),
     }
 
     core_ready = components["llm"] and components["rag"]

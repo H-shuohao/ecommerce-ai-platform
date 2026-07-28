@@ -101,6 +101,30 @@ class FFmpegService:
         if not target.is_file() or target.stat().st_size == 0:
             raise FFmpegProcessingError("FFmpeg 没有生成有效的切片文件")
 
+    def extract_audio(self, source: Path, target: Path) -> None:
+        ffmpeg = self._resolve_binary(self.ffmpeg_binary)
+        command = [
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+            "-y",
+            "-i",
+            str(source),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            "-c:a",
+            "pcm_s16le",
+            str(target),
+        ]
+        self._run(command, "提取直播回放音频")
+        if not target.is_file() or target.stat().st_size == 0:
+            raise FFmpegProcessingError("FFmpeg 没有生成有效的音频文件")
+
     def _run(
         self,
         command: list[str],

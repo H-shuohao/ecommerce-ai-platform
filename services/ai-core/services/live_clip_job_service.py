@@ -7,6 +7,7 @@ from app.schemas.live_clips import (
     LiveClipPipelineRequest,
     LiveClipPlanRequest,
 )
+from services.asr_service import ASRService, asr_service
 from services.live_clip_agent_service import LiveClipAgentService, live_clip_agent_service
 from services.live_clip_execution_service import (
     LiveClipExecutionService,
@@ -17,6 +18,10 @@ from services.live_clip_job_repository import (
     live_clip_job_repository,
 )
 from services.media_asset_service import MediaAssetService, media_asset_service
+from services.media_storage_service import (
+    MediaStorageService,
+    media_storage_service,
+)
 
 
 class LiveClipJobService:
@@ -27,11 +32,15 @@ class LiveClipJobService:
         planner: LiveClipAgentService = live_clip_agent_service,
         executor: LiveClipExecutionService = live_clip_execution_service,
         asset_service: MediaAssetService = media_asset_service,
+        transcriber: ASRService = asr_service,
+        storage_service: MediaStorageService = media_storage_service,
     ) -> None:
         self.repository = repository
         self.planner = planner
         self.executor = executor
         self.asset_service = asset_service
+        self.transcriber = transcriber
+        self.storage_service = storage_service
         self._tasks: set[asyncio.Task[None]] = set()
 
     def submit(
@@ -110,6 +119,20 @@ class LiveClipJobService:
             if request is None:
                 raise RuntimeError("找不到直播切片任务请求")
             source = self._validate_source(request)
+
+            if not request.transcript:
+                source_path = self.storage_service.resolve(source.uri)
+                transcript = await self.transcriber.transcribe_video(
+                    source_path,
+                    language=request.transcript_language,
+                )
+                saved = self.repository.save_transcript(job_id, transcript)
+                if saved is None:
+                    raise RuntimeError("ASR 转写进度保存失败")
+                request = self.repository.load_request(job_id)
+                if request is None or not request.transcript:
+                    raise RuntimeError("ASR 转写结果读取失败")
+                job = saved
 
             planned_asset_ids = list(job.planned_asset_ids)
             if not planned_asset_ids:

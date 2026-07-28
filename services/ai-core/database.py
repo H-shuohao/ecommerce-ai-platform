@@ -188,9 +188,16 @@ class Database:
                     source_asset_id TEXT NOT NULL,
                     transcript_json TEXT NOT NULL,
                     transcript_segment_count INTEGER NOT NULL,
+                    transcript_source TEXT NOT NULL DEFAULT 'provided'
+                        CHECK (transcript_source IN ('provided', 'asr')),
                     max_clips INTEGER NOT NULL,
                     status TEXT NOT NULL
                         CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
+                    stage TEXT NOT NULL DEFAULT 'queued'
+                        CHECK (stage IN (
+                            'queued', 'transcribing', 'planning',
+                            'cutting', 'completed', 'failed'
+                        )),
                     planned_asset_ids_json TEXT NOT NULL DEFAULT '[]',
                     output_asset_ids_json TEXT NOT NULL DEFAULT '[]',
                     error TEXT,
@@ -307,6 +314,23 @@ class Database:
                 "CREATE INDEX IF NOT EXISTS idx_media_assets_sha256 "
                 "ON media_assets(sha256)"
             )
+            live_clip_columns = {
+                row["name"]
+                for row in self.connection.execute(
+                    "PRAGMA table_info(live_clip_pipeline_jobs)"
+                ).fetchall()
+            }
+            if "transcript_source" not in live_clip_columns:
+                self.connection.execute(
+                    "ALTER TABLE live_clip_pipeline_jobs "
+                    "ADD COLUMN transcript_source TEXT NOT NULL "
+                    "DEFAULT 'provided'"
+                )
+            if "stage" not in live_clip_columns:
+                self.connection.execute(
+                    "ALTER TABLE live_clip_pipeline_jobs "
+                    "ADD COLUMN stage TEXT NOT NULL DEFAULT 'queued'"
+                )
             auth_user_columns = {
                 row["name"]
                 for row in self.connection.execute(

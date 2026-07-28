@@ -17,6 +17,7 @@ from app.schemas.live_clips import (
 )
 from app.schemas.media_assets import MediaAssetCreate
 from database import Database
+from services.asr_service import ASRService
 from services.ffmpeg_service import FFmpegService
 from services.live_clip_agent_service import LiveClipAgentService
 from services.live_clip_execution_service import LiveClipExecutionService
@@ -26,6 +27,31 @@ from services.llm_service import llm_service
 from services.media_asset_repository import MediaAssetRepository
 from services.media_asset_service import MediaAssetService
 from services.media_storage_service import MediaStorageService
+
+
+class SmokeTestASRProvider:
+    async def transcribe(self, audio_path: Path, *, language: str):
+        if not audio_path.is_file() or audio_path.stat().st_size == 0:
+            raise AssertionError("FFmpeg 没有向 ASR 提供有效音频")
+        if language != "zh":
+            raise AssertionError("ASR 语言参数传递错误")
+        return [
+            TranscriptSegment(
+                start_seconds=0,
+                end_seconds=4,
+                text="这款清爽防晒乳轻薄不黏腻，适合油性和混合性肤质。",
+            ),
+            TranscriptSegment(
+                start_seconds=4,
+                end_seconds=8,
+                text="它具有SPF50+防晒能力，适合日常通勤使用。",
+            ),
+            TranscriptSegment(
+                start_seconds=8,
+                end_seconds=12,
+                text="目前库存充足，售价129元，感兴趣可以进一步了解。",
+            ),
+        ]
 
 
 def generate_source_video(ffmpeg: FFmpegService, target: Path) -> None:
@@ -85,11 +111,18 @@ async def run() -> dict:
             ffmpeg=ffmpeg,
             max_duration_seconds=20,
         )
+        transcriber = ASRService(
+            provider=SmokeTestASRProvider(),
+            ffmpeg=ffmpeg,
+            storage_service=storage,
+        )
         pipeline = LiveClipJobService(
             repository=repository,
             planner=planner,
             executor=executor,
             asset_service=asset_service,
+            transcriber=transcriber,
+            storage_service=storage,
         )
 
         temporary_video = storage.reserve_temporary_path(".mp4")
@@ -117,23 +150,7 @@ async def run() -> dict:
         request = LiveClipPipelineRequest(
             product_id="P1001",
             source_asset_id=source.id,
-            transcript=[
-                TranscriptSegment(
-                    start_seconds=0,
-                    end_seconds=4,
-                    text="这款清爽防晒乳轻薄不黏腻，适合油性和混合性肤质。",
-                ),
-                TranscriptSegment(
-                    start_seconds=4,
-                    end_seconds=8,
-                    text="它具有SPF50+防晒能力，适合日常通勤使用。",
-                ),
-                TranscriptSegment(
-                    start_seconds=8,
-                    end_seconds=12,
-                    text="目前库存充足，售价129元，感兴趣可以进一步了解。",
-                ),
-            ],
+            transcript=[],
             max_clips=1,
         )
         job = repository.create(
@@ -154,9 +171,13 @@ async def run() -> dict:
         output_duration = ffmpeg.probe_duration(output_path)
         return {
             "status": completed.status,
+            "stage": completed.stage,
             "job_id": completed.id,
             "attempt_count": completed.attempt_count,
             "transcript_segment_count": completed.transcript_segment_count,
+            "transcript_source": completed.transcript_source,
+            "asr_audio_extraction": "real-ffmpeg",
+            "asr_provider": "deterministic-smoke-test",
             "planned_asset_count": len(completed.planned_asset_ids),
             "output_asset_count": len(completed.output_asset_ids),
             "output_duration_seconds": output_duration,

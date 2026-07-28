@@ -62,6 +62,14 @@ class Config:
         1.0,
         float(os.getenv("LIVE_CLIP_MAX_DURATION_SECONDS", "300")),
     )
+    ASR_PROVIDER = os.getenv("ASR_PROVIDER", "disabled").strip().lower()
+    ASR_API_URL = os.getenv("ASR_API_URL", "").strip()
+    ASR_API_KEY = os.getenv("ASR_API_KEY", "").strip()
+    ASR_MODEL = os.getenv("ASR_MODEL", "whisper-1").strip() or "whisper-1"
+    ASR_TIMEOUT_SECONDS = max(
+        1.0,
+        float(os.getenv("ASR_TIMEOUT_SECONDS", "180")),
+    )
     METRIC_ALERT_MINIMUM_SAMPLES = max(
         1,
         int(os.getenv("METRIC_ALERT_MINIMUM_SAMPLES", "20")),
@@ -109,6 +117,7 @@ class Config:
         "你好，我是小懒，有什么需要帮忙的吗？",
     )
 
+    # RTC 实时 ASR 的应用 ID；与上面的直播回放批量 ASR 配置不是同一接口。
     ASR_APP_ID = os.getenv("ASR_APP_ID")
     TTS_APP_ID = os.getenv("TTS_APP_ID")
     

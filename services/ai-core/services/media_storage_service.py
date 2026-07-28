@@ -118,6 +118,7 @@ class MediaStorageService:
     def reserve_temporary_path(self, suffix: str) -> Path:
         normalized_suffix = suffix.strip().lower()
         allowed_suffixes = {item[1] for item in self._CONTENT_TYPES.values()}
+        allowed_suffixes.add(".wav")
         if normalized_suffix not in allowed_suffixes:
             raise AssetFileError(f"不支持的临时文件扩展名: {normalized_suffix}")
         return self.temp_root / f"{uuid4().hex}{normalized_suffix}"

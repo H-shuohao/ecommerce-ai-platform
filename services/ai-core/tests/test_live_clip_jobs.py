@@ -83,6 +83,7 @@ class FakePlanner:
 
     async def plan(self, request):
         self.call_count += 1
+        self.last_request = request
         return LiveClipPlanResponse(
             product_id=request.product_id,
             source_video_uri=request.video_uri,
@@ -131,6 +132,34 @@ class ResumableExecutor:
         )
 
 
+class FakeTranscriber:
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    async def transcribe_video(self, source_path, *, language):
+        self.call_count += 1
+        return [
+            TranscriptSegment(
+                start_seconds=0,
+                end_seconds=8,
+                text=f"ASR 自动转写，语言为 {language}",
+            ),
+            TranscriptSegment(
+                start_seconds=8,
+                end_seconds=16,
+                text="第二段直播话术",
+            ),
+        ]
+
+
+class FakeStorage:
+    def __init__(self, path) -> None:
+        self.path = path
+
+    def resolve(self, uri):
+        return self.path
+
+
 class LiveClipJobRepositoryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.db = Database(":memory:")
@@ -177,6 +206,7 @@ class LiveClipJobRepositoryTests(unittest.TestCase):
         self.assertEqual(self.repository.requeue_interrupted(), 1)
         recovered = self.repository.get(created.id)
         self.assertEqual(recovered.status, "queued")
+        self.assertEqual(recovered.stage, "queued")
         self.assertEqual(recovered.planned_asset_ids, ["plan-1", "plan-2"])
         self.assertEqual(recovered.output_asset_ids, ["output-plan-1"])
 
@@ -213,6 +243,7 @@ class LiveClipJobServiceTests(unittest.IsolatedAsyncioTestCase):
         await service.run(job.id)
         failed = self.repository.get(job.id)
         self.assertEqual(failed.status, "failed")
+        self.assertEqual(failed.stage, "failed")
         self.assertEqual(failed.planned_asset_ids, ["plan-1", "plan-2"])
         self.assertEqual(failed.output_asset_ids, ["output-plan-1"])
 
@@ -221,12 +252,48 @@ class LiveClipJobServiceTests(unittest.IsolatedAsyncioTestCase):
         completed = self.repository.get(job.id)
 
         self.assertEqual(completed.status, "succeeded")
+        self.assertEqual(completed.stage, "completed")
         self.assertEqual(
             completed.output_asset_ids,
             ["output-plan-1", "output-plan-2"],
         )
         self.assertEqual(planner.call_count, 1)
         self.assertEqual(executor.calls, ["plan-1", "plan-2", "plan-2"])
+
+    async def test_empty_transcript_runs_asr_once_and_persists_result(self):
+        planner = FakePlanner()
+        executor = ResumableExecutor(self.source.id)
+        transcriber = FakeTranscriber()
+        request = pipeline_request(self.source.id).model_copy(
+            update={"transcript": []}
+        )
+        service = LiveClipJobService(
+            repository=self.repository,
+            planner=planner,
+            executor=executor,
+            asset_service=FakeAssetService(self.source.id),
+            transcriber=transcriber,
+            storage_service=FakeStorage("source.mp4"),
+        )
+        job = self.repository.create(request)
+
+        await service.run(job.id)
+        failed = self.repository.get(job.id)
+
+        self.assertEqual(failed.status, "failed")
+        self.assertEqual(failed.stage, "failed")
+        self.assertEqual(failed.transcript_source, "asr")
+        self.assertEqual(failed.transcript_segment_count, 2)
+        self.assertEqual(transcriber.call_count, 1)
+        self.assertEqual(len(planner.last_request.transcript), 2)
+
+        self.repository.queue_retry(job.id)
+        await service.run(job.id)
+        completed = self.repository.get(job.id)
+
+        self.assertEqual(completed.status, "succeeded")
+        self.assertEqual(completed.stage, "completed")
+        self.assertEqual(transcriber.call_count, 1)
 
 
 class LiveClipJobApiTests(unittest.TestCase):

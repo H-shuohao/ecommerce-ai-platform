@@ -10,6 +10,7 @@ from app.schemas.live_clips import (
     LiveClipPipelineJob,
     LiveClipPipelineRequest,
     LiveClipPipelineStatus,
+    TranscriptSegment,
 )
 from database import Database, database
 
@@ -41,8 +42,10 @@ class LiveClipJobRepository:
             product_id=row["product_id"],
             source_asset_id=row["source_asset_id"],
             transcript_segment_count=row["transcript_segment_count"],
+            transcript_source=row["transcript_source"],
             max_clips=row["max_clips"],
             status=row["status"],
+            stage=row["stage"],
             planned_asset_ids=json.loads(row["planned_asset_ids_json"]),
             output_asset_ids=json.loads(row["output_asset_ids_json"]),
             error=row["error"],
@@ -71,10 +74,11 @@ class LiveClipJobRepository:
                 INSERT OR IGNORE INTO live_clip_pipeline_jobs
                 (id, idempotency_key, request_fingerprint, product_id,
                  source_asset_id, transcript_json, transcript_segment_count,
-                 max_clips, status, planned_asset_ids_json,
+                 transcript_source,
+                 max_clips, status, stage, planned_asset_ids_json,
                  output_asset_ids_json, error, attempt_count, max_attempts,
                  created_at, updated_at, started_at, finished_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', '[]', '[]',
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 'queued', '[]', '[]',
                         NULL, 0, ?, ?, ?, NULL, NULL)
                 """
                 if idempotency_key
@@ -82,10 +86,11 @@ class LiveClipJobRepository:
                 INSERT INTO live_clip_pipeline_jobs
                 (id, idempotency_key, request_fingerprint, product_id,
                  source_asset_id, transcript_json, transcript_segment_count,
-                 max_clips, status, planned_asset_ids_json,
+                 transcript_source,
+                 max_clips, status, stage, planned_asset_ids_json,
                  output_asset_ids_json, error, attempt_count, max_attempts,
                  created_at, updated_at, started_at, finished_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', '[]', '[]',
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 'queued', '[]', '[]',
                         NULL, 0, ?, ?, ?, NULL, NULL)
                 """
             )
@@ -99,6 +104,7 @@ class LiveClipJobRepository:
                     request.source_asset_id,
                     request_json,
                     len(request.transcript),
+                    "provided" if request.transcript else "asr",
                     request.max_clips,
                     max_attempts,
                     now,
@@ -141,6 +147,38 @@ class LiveClipJobRepository:
             return None
         return LiveClipPipelineRequest.model_validate_json(row["transcript_json"])
 
+    def save_transcript(
+        self,
+        job_id: str,
+        transcript: list[TranscriptSegment],
+    ) -> LiveClipPipelineJob | None:
+        if not transcript:
+            raise ValueError("ASR 转写不能为空")
+        request = self.load_request(job_id)
+        if request is None:
+            return None
+        updated_request = request.model_copy(update={"transcript": transcript})
+        request_json = json.dumps(
+            updated_request.model_dump(mode="json"),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        now = self._now()
+        with self.db.lock, self.db.connection:
+            cursor = self.db.connection.execute(
+                """
+                UPDATE live_clip_pipeline_jobs
+                SET transcript_json = ?, transcript_segment_count = ?,
+                    transcript_source = 'asr', stage = 'planning',
+                    updated_at = ?
+                WHERE id = ? AND status = 'running'
+                  AND transcript_segment_count = 0
+                """,
+                (request_json, len(transcript), now, job_id),
+            )
+        return self.get(job_id) if cursor.rowcount else None
+
     def list(
         self,
         *,
@@ -173,6 +211,10 @@ class LiveClipJobRepository:
                 """
                 UPDATE live_clip_pipeline_jobs
                 SET status = 'running', attempt_count = attempt_count + 1,
+                    stage = CASE
+                        WHEN transcript_segment_count = 0
+                        THEN 'transcribing' ELSE 'planning'
+                    END,
                     error = NULL, started_at = ?, finished_at = NULL, updated_at = ?
                 WHERE id = ? AND status = 'queued' AND attempt_count < max_attempts
                 """,
@@ -190,7 +232,7 @@ class LiveClipJobRepository:
             cursor = self.db.connection.execute(
                 """
                 UPDATE live_clip_pipeline_jobs
-                SET planned_asset_ids_json = ?, updated_at = ?
+                SET planned_asset_ids_json = ?, stage = 'cutting', updated_at = ?
                 WHERE id = ? AND status = 'running'
                 """,
                 (json.dumps(planned_asset_ids), now, job_id),
@@ -248,10 +290,18 @@ class LiveClipJobRepository:
             cursor = self.db.connection.execute(
                 """
                 UPDATE live_clip_pipeline_jobs
-                SET status = ?, error = ?, finished_at = ?, updated_at = ?
+                SET status = ?, stage = ?, error = ?,
+                    finished_at = ?, updated_at = ?
                 WHERE id = ? AND status = 'running'
                 """,
-                (status, error, now, now, job_id),
+                (
+                    status,
+                    "completed" if status == "succeeded" else "failed",
+                    error,
+                    now,
+                    now,
+                    job_id,
+                ),
             )
         return self.get(job_id) if cursor.rowcount else None
 
@@ -261,7 +311,8 @@ class LiveClipJobRepository:
             cursor = self.db.connection.execute(
                 """
                 UPDATE live_clip_pipeline_jobs
-                SET status = 'queued', error = NULL, updated_at = ?,
+                SET status = 'queued', stage = 'queued',
+                    error = NULL, updated_at = ?,
                     started_at = NULL, finished_at = NULL
                 WHERE id = ? AND status = 'failed' AND attempt_count < max_attempts
                 """,
@@ -275,7 +326,7 @@ class LiveClipJobRepository:
             cursor = self.db.connection.execute(
                 """
                 UPDATE live_clip_pipeline_jobs
-                SET status = 'queued',
+                SET status = 'queued', stage = 'queued',
                     error = '服务重启，任务已从最近进度重新排队',
                     updated_at = ?, started_at = NULL, finished_at = NULL
                 WHERE status = 'running'
