@@ -18,7 +18,8 @@
 [五分钟演示](docs/demo/five-minute-walkthrough.md) ·
 [真实评测记录](docs/evaluation/2026-07-24-presales-v2.md) ·
 [基础接口压测](docs/performance/2026-07-25-local-commerce.md) ·
-[真实 Agent 并发测试](docs/performance/2026-07-25-local-agent-c2.md)
+[真实 Agent 并发测试](docs/performance/2026-07-25-local-agent-c2.md) ·
+[八项目一键验收](docs/architecture/architecture-acceptance.md)
 
 ## 30秒看懂项目
 
@@ -79,7 +80,7 @@ Evaluation：使用固定题目检查工具选择、答案与耗时
 - **多模态素材中心（增强基础版）**：统一登记图片、视频和文本素材元数据，支持真实文件上传、商品/类型/标签检索、文件签名与大小校验、SHA-256内容寻址去重、本地持久化和受控下载。
 - **直播切片 Agent（可运行版）**：支持手工字幕或“FFmpeg提取音轨→可插拔批量ASR→时间戳落库”；通过持久化异步任务编排LLM选段和多个FFmpeg裁剪，支持202接单、幂等冲突检测、ASR结果复用、逐片保存进度、失败续跑和服务重启恢复；生成的MP4重新登记到素材中心等待人工审核。
 - **轻量数据中台**：数据资产目录、8项质量规则、候选数据校验、发布门禁、版本激活和回滚。
-- **Agent 评测系统**：16条固定测试用例、工具选择准确率、P50/P95耗时、结构化失败分类、历史版本与基线对比。
+- **Agent 评测系统**：30条固定测试用例、工具选择准确率、P50/P95耗时、结构化失败分类、历史版本与基线对比。
 - **运行可观测性**：记录 Agent 运行、工具调用、成功率、耗时和 RAG 使用情况。
 - **请求级可观测性**：为每次 HTTP 请求生成 `request_id`，输出 JSON 访问日志，并在统一错误响应中返回追踪编号。
 - **缓存与一致性**：商品搜索使用有界 TTL 缓存并统计命中率，数据版本发布或回滚时自动失效；实时库存和订单不缓存。
@@ -97,15 +98,16 @@ Evaluation：使用固定题目检查工具选择、答案与耗时
 
 ## 真实验证结果
 
-- 自动化测试：AI Core `136/136` 通过，告警 Webhook `2/2` 通过。
+- 自动化测试：AI Core `138/138` 通过，告警 Webhook `2/2` 通过。
 - 售前 Agent v3真实评测：`30/30` 通过。
 - 工具选择准确率：`100%`。
 - 平均耗时：`2490.6 ms`；P50：`2082 ms`；P95：`4334 ms`（真实模型调用环境，结果会随网络与模型状态变化）。
 - 本机基础接口压测：2000请求、20并发、成功率`100%`、吞吐量`379.92 req/s`、P95 `122.3 ms`（本机回环商品查询，不代表Agent或生产环境容量）。
 - 小规模真实 Agent 并发测试：8请求、并发2、业务校验通过率`100%`、平均耗时`1970.73 ms`、P95 `3244.35 ms`（四类固定场景，本机调用真实模型，不代表生产容量）。
 - Docker 容器健康状态：`healthy`，`/health` 与 `/docs` 均返回 HTTP 200。
+- 八项目完整验收：18项中16项通过、0项失败、1项警告、1项主动跳过，已执行用例通过率`94.12%`，总耗时`15744 ms`；详见[脱敏验收记录](docs/evaluation/2026-07-28-architecture-acceptance.md)。
 
-> 评测中的100%仅代表当前16个固定案例，不代表所有自然语言问题都能达到100%准确率。耗时受外部模型和网络状态影响。
+> 评测中的100%仅代表当前30个固定案例，不代表所有自然语言问题都能达到100%准确率。耗时受外部模型和网络状态影响。
 
 ## 目录结构
 
@@ -293,6 +295,22 @@ session → status → tool → delta... → done
 - `error`：流式执行中发生错误时返回可追踪的错误事件。
 
 旧版 `POST /api/v1/agents/presales/chat` JSON 接口继续保留，便于 Swagger 调试和兼容不支持流式读取的客户端。对于“P1002现在有库存吗”这类已经包含商品编号的动态库存问题，系统直接调用 `check_inventory`；需要理解模糊需求或组合多个工具时，仍由大模型进行规划。这属于“确定性规则兜底 + 模型推理”的混合 Agent 设计。
+
+## 八项目一键验收
+
+Docker 服务启动后，可快速检查八个项目的只读能力：
+
+```powershell
+docker exec ecommerce-ai-core python scripts/run_architecture_acceptance.py --mode quick
+```
+
+面试演示或版本发布前，可执行包含真实多轮 Agent、异步内容任务、MCP 和 FFmpeg 切片的完整验收：
+
+```powershell
+docker exec ecommerce-ai-core python scripts/run_architecture_acceptance.py --mode full
+```
+
+验收会生成 JSON 和 Markdown 证据报告。完整用例矩阵、认证方式和边界说明见[八项目一键验收文档](docs/architecture/architecture-acceptance.md)。
 
 ## 自动化测试
 

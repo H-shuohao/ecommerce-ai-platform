@@ -1,14 +1,20 @@
 import asyncio
+import os
 
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
 
-MCP_URL = "http://127.0.0.1:8000/mcp/"
+MCP_URL = os.getenv("MCP_URL", "http://127.0.0.1:8000/mcp/")
+MCP_API_KEY = os.getenv("MCP_API_KEY")
 
 
 async def main() -> None:
-    async with streamablehttp_client(MCP_URL) as (read_stream, write_stream, _):
+    headers = {"X-API-Key": MCP_API_KEY} if MCP_API_KEY else None
+    async with streamablehttp_client(
+        MCP_URL,
+        headers=headers,
+    ) as (read_stream, write_stream, _):
         async with ClientSession(read_stream, write_stream) as session:
             await session.initialize()
             tools = await session.list_tools()
