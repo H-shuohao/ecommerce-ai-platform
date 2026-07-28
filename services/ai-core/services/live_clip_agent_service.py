@@ -3,9 +3,9 @@ import json
 
 from app.schemas.live_clips import LiveClip, LiveClipPlanRequest, LiveClipPlanResponse
 from app.schemas.media_assets import MediaAssetCreate
-from services.commerce_service import commerce_service
-from services.llm_service import llm_service
-from services.media_asset_service import media_asset_service
+from services.commerce_service import CommerceService, commerce_service
+from services.llm_service import LLMService, llm_service
+from services.media_asset_service import MediaAssetService, media_asset_service
 
 
 LIVE_CLIP_PROMPT = """
@@ -18,6 +18,17 @@ LIVE_CLIP_PROMPT = """
 
 
 class LiveClipAgentService:
+    def __init__(
+        self,
+        *,
+        commerce: CommerceService = commerce_service,
+        llm: LLMService = llm_service,
+        asset_service: MediaAssetService = media_asset_service,
+    ) -> None:
+        self.commerce = commerce
+        self.llm = llm
+        self.asset_service = asset_service
+
     @staticmethod
     def _extract_json(text: str) -> dict:
         start = text.find("{")
@@ -30,7 +41,7 @@ class LiveClipAgentService:
         return value
 
     async def plan(self, request: LiveClipPlanRequest) -> LiveClipPlanResponse:
-        if commerce_service.get_product(request.product_id) is None:
+        if self.commerce.get_product(request.product_id) is None:
             raise KeyError(f"商品不存在: {request.product_id}")
         transcript_start = min(item.start_seconds for item in request.transcript)
         transcript_end = max(item.end_seconds for item in request.transcript)
@@ -40,7 +51,7 @@ class LiveClipAgentService:
             "transcript": [item.model_dump() for item in request.transcript],
         }
         text = await asyncio.to_thread(
-            llm_service.complete,
+            self.llm.complete,
             [
                 {"role": "system", "content": LIVE_CLIP_PROMPT},
                 {"role": "user", "content": json.dumps(context, ensure_ascii=False)},
@@ -69,7 +80,7 @@ class LiveClipAgentService:
             if start < transcript_start or end > transcript_end or end <= start:
                 raise ValueError("模型返回的切片时间超出转写范围")
             clip_uri = f"{request.video_uri}#t={float(start):g},{float(end):g}"
-            asset = media_asset_service.create(
+            asset = self.asset_service.create(
                 MediaAssetCreate(
                     asset_type="video",
                     title=title.strip(),

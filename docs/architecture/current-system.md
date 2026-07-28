@@ -1,7 +1,7 @@
 # 当前已实现系统架构
 
 这张图只展示仓库中已经实现并验证的能力。直播切片已包含本地
-FFmpeg物理裁剪，多模态素材中心包含真实文件存储；模型微调尚未实现，
+持久化异步编排和FFmpeg物理裁剪，多模态素材中心包含真实文件存储；模型微调尚未实现，
 因此不画入已完成架构。
 
 ## 总体架构
@@ -23,7 +23,7 @@ flowchart TB
         Observe["运行可观测性"]
         DataPlatform["轻量 AI 数据中台"]
         Assets["多模态素材中心\n上传 / 哈希去重 / 下载"]
-        LiveClips["直播切片 Agent\n规划 / FFmpeg执行"]
+        LiveClips["直播切片 Agent\n异步编排 / 规划 / FFmpeg执行"]
         MCP["MCP Server"]
         Voice["RTC / ASR / TTS 回调"]
     end
@@ -39,7 +39,7 @@ flowchart TB
 
     subgraph data["数据与状态"]
         Commerce["commerce.json\n商品 / 库存 / 订单"]
-        SQLite["SQLite\n会话 / Run / 审核 / 评测 / 发布"]
+        SQLite["SQLite\n会话 / Run / 审核 / 评测 / 发布 / 异步任务"]
         Catalog["数据目录 / 质量报告 / 版本快照"]
         Files["本地素材文件\n源视频 / 物理切片"]
     end

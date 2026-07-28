@@ -38,15 +38,18 @@ from app.core.observability import (
 from app.core.rate_limiting import enforce_rate_limit
 from fastapi.exceptions import RequestValidationError
 from services.content_job_service import content_job_service
+from services.live_clip_job_service import live_clip_job_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     content_job_service.recover_incomplete()
+    live_clip_job_service.recover_incomplete()
     try:
         async with commerce_mcp.session_manager.run():
             yield
     finally:
+        await live_clip_job_service.shutdown()
         await content_job_service.shutdown()
 
 OPENAPI_TAGS = [

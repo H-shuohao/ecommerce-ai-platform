@@ -180,6 +180,33 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_media_assets_product_type
                 ON media_assets(product_id, asset_type, created_at DESC);
 
+                CREATE TABLE IF NOT EXISTS live_clip_pipeline_jobs (
+                    id TEXT PRIMARY KEY,
+                    idempotency_key TEXT UNIQUE,
+                    request_fingerprint TEXT NOT NULL,
+                    product_id TEXT NOT NULL,
+                    source_asset_id TEXT NOT NULL,
+                    transcript_json TEXT NOT NULL,
+                    transcript_segment_count INTEGER NOT NULL,
+                    max_clips INTEGER NOT NULL,
+                    status TEXT NOT NULL
+                        CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
+                    planned_asset_ids_json TEXT NOT NULL DEFAULT '[]',
+                    output_asset_ids_json TEXT NOT NULL DEFAULT '[]',
+                    error TEXT,
+                    attempt_count INTEGER NOT NULL DEFAULT 0,
+                    max_attempts INTEGER NOT NULL DEFAULT 3,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    started_at TEXT,
+                    finished_at TEXT,
+                    FOREIGN KEY (source_asset_id) REFERENCES media_assets(id)
+                        ON DELETE RESTRICT
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_live_clip_jobs_status_created
+                ON live_clip_pipeline_jobs(status, created_at DESC);
+
                 CREATE TABLE IF NOT EXISTS auth_users (
                     username TEXT PRIMARY KEY,
                     password_hash TEXT NOT NULL,
